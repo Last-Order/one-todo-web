@@ -1,0 +1,22 @@
+[package]
+name = "one-todo-web"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = "0.6.20"
+dotenvy = "0.15.7"
+hyper = { version = "0.14.27", features = ["full"] }
+sea-orm = { version = "0.12", features = [
+    "sqlx-mysql",
+    "runtime-tokio-rustls",
+    "macros",
+] }
+tokio = { version = "1.31.0", features = ["full"] }
+tower = "0.4.13"
+entity = { path = "./entity" }
+serde = "1.0.183"
+serde_json = "1.0.105"
+anyhow = "1.0.74"
