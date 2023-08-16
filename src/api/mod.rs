@@ -1,4 +1,5 @@
 pub mod todo;
+pub mod oauth;
 
 use sea_orm::DatabaseConnection;
 

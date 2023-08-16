@@ -2,7 +2,7 @@ mod api;
 
 use std::env;
 
-use api::{todo::list, AppState};
+use api::{oauth::login, todo::list, AppState};
 use axum::{routing::get, Router};
 use sea_orm::Database;
 
@@ -22,6 +22,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
         .route("/list", get(list))
+        .route("/oauth/google/login", get(login))
         .with_state(state);
 
     // run it with hyper on localhost:3000
