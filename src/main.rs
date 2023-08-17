@@ -2,13 +2,20 @@ mod api;
 
 use std::env;
 
-use api::{oauth::login, todo::list, AppState};
+use api::{
+    oauth::{login, oauth_callback},
+    todo::list,
+    AppState,
+};
 use axum::{routing::get, Router};
 use sea_orm::Database;
 
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .init();
 
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
 
@@ -23,6 +30,7 @@ async fn main() {
         .route("/", get(|| async { "Hello, World!" }))
         .route("/list", get(list))
         .route("/oauth/google/login", get(login))
+        .route("/oauth/google/callback", get(oauth_callback))
         .with_state(state);
 
     // run it with hyper on localhost:3000
