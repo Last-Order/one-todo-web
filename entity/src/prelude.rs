@@ -2,3 +2,4 @@
 
 pub use super::oauth2_state_storage::Entity as Oauth2StateStorage;
 pub use super::todos::Entity as Todos;
+pub use super::users::Entity as Users;

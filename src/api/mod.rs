@@ -1,5 +1,8 @@
+pub mod jwt_auth;
 pub mod oauth;
 pub mod todo;
+
+pub mod model;
 
 use sea_orm::DatabaseConnection;
 use serde::Serialize;
@@ -11,6 +14,13 @@ pub struct AppState {
 
 #[derive(Serialize)]
 pub struct AppError {
-    pub code: String,
-    pub message: String,
+    pub code: &'static str,
+    pub message: &'static str,
+}
+
+#[derive(Clone, Serialize)]
+pub struct UserData {
+    pub id: i64,
+    pub email: String,
+    pub name: String,
 }

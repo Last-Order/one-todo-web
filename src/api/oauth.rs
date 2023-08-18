@@ -1,6 +1,8 @@
 use std::{collections::HashMap, env};
 
 use anyhow::anyhow;
+use chrono;
+use reqwest;
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -8,16 +10,16 @@ use axum::{
     Json,
 };
 use axum_macros::debug_handler;
-use entity::oauth2_state_storage;
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
+use entity::{oauth2_state_storage, users};
+use jsonwebtoken::{encode, EncodingKey, Header};
 use oauth2::{
     basic::BasicClient, reqwest::http_client, AuthUrl, AuthorizationCode, ClientId, ClientSecret,
     CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RevocationUrl, Scope,
     TokenResponse, TokenUrl,
 };
-use reqwest;
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
 
-use super::{AppError, AppState};
+use super::{model::TokenClaims, AppError, AppState};
 
 fn get_oauth_client() -> Result<BasicClient, anyhow::Error> {
     let google_client_id = ClientId::new(
@@ -59,8 +61,8 @@ pub async fn login(
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AppError {
-                code: "oauth_client_error".to_owned(),
-                message: "".to_owned(),
+                code: "oauth_client_error",
+                message: "",
             }),
         )
     })?;
@@ -80,6 +82,8 @@ pub async fn login(
             "https://www.googleapis.com/auth/calendar".to_string(),
         ))
         .set_pkce_challenge(pkce_code_challenge)
+        .add_extra_param("access_type", "offline")
+        .add_extra_param("prompt", "consent")
         .url();
     let result = oauth2_state_storage::ActiveModel {
         csrf_state: Set(csrf_state.secret().to_owned()),
@@ -99,18 +103,28 @@ pub async fn oauth_callback(
     let state = CsrfToken::new(params.remove("state").ok_or((
         StatusCode::BAD_REQUEST,
         Json(AppError {
-            code: "missing_state".to_owned(),
-            message: "".to_owned(),
+            code: "missing_state",
+            message: "",
         }),
     ))?);
 
     let code = AuthorizationCode::new(params.remove("code").ok_or((
         StatusCode::BAD_REQUEST,
         Json(AppError {
-            code: "missing_code".to_owned(),
-            message: "".to_owned(),
+            code: "missing_code",
+            message: "",
         }),
     ))?);
+
+    let scope = params.remove("scope").ok_or((
+        StatusCode::BAD_REQUEST,
+        Json(AppError {
+            code: "missing_scope",
+            message: "",
+        }),
+    ))?;
+
+    let has_calendar_access: i8 = if scope.contains("calendar") { 1 } else { 0 };
 
     let result = oauth2_state_storage::Entity::find()
         .filter(oauth2_state_storage::Column::CsrfState.eq(state.secret()))
@@ -120,16 +134,16 @@ pub async fn oauth_callback(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
-                    code: "database_error".to_owned(),
-                    message: "".to_owned(),
+                    code: "database_error",
+                    message: "",
                 }),
             )
         })?
         .ok_or((
             StatusCode::BAD_REQUEST,
             Json(AppError {
-                code: "invalid_state".to_owned(),
-                message: "".to_owned(),
+                code: "invalid_state",
+                message: "",
             }),
         ))?;
 
@@ -139,8 +153,8 @@ pub async fn oauth_callback(
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AppError {
-                code: "oauth_client_error".to_owned(),
-                message: "".to_owned(),
+                code: "oauth_client_error",
+                message: "",
             }),
         )
     })?;
@@ -157,8 +171,8 @@ pub async fn oauth_callback(
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AppError {
-                code: "exchange_code_failed".to_owned(),
-                message: "".to_owned(),
+                code: "exchange_code_failed",
+                message: "",
             }),
         )
     })?
@@ -166,13 +180,23 @@ pub async fn oauth_callback(
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AppError {
-                code: "spawning_failed".to_owned(),
-                message: "".to_owned(),
+                code: "spawning_failed",
+                message: "",
             }),
         )
     })?;
 
     let access_token = token_response.access_token().secret();
+    let refresh_token = token_response
+        .refresh_token()
+        .ok_or((
+            StatusCode::BAD_REQUEST,
+            Json(AppError {
+                code: "missing_refresh_token",
+                message: "",
+            }),
+        ))?
+        .secret();
 
     // Get user info from Google
 
@@ -184,8 +208,8 @@ pub async fn oauth_callback(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
-                    code: "get_userinfo_failed".to_owned(),
-                    message: "".to_owned(),
+                    code: "get_userinfo_failed",
+                    message: "",
                 }),
             )
         })?
@@ -195,8 +219,8 @@ pub async fn oauth_callback(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
-                    code: "invalid_user_info".to_owned(),
-                    message: "".to_owned(),
+                    code: "invalid_user_info",
+                    message: "",
                 }),
             )
         })?;
@@ -205,8 +229,8 @@ pub async fn oauth_callback(
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AppError {
-                code: "invalid_user_info".to_owned(),
-                message: "".to_owned(),
+                code: "invalid_user_info",
+                message: "",
             }),
         )
     })?;
@@ -217,28 +241,118 @@ pub async fn oauth_callback(
         .ok_or((
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AppError {
-                code: "missing_email".to_owned(),
-                message: "".to_owned(),
+                code: "missing_email",
+                message: "",
             }),
         ))?
         .to_owned();
+
     let verified_email = body["verified_email"].take().as_bool().ok_or((
         StatusCode::INTERNAL_SERVER_ERROR,
         Json(AppError {
-            code: "missing_verified_email".to_owned(),
-            message: "".to_owned(),
+            code: "missing_verified_email",
+            message: "",
         }),
     ))?;
+
+    let name = body["name"]
+        .take()
+        .as_str()
+        .ok_or((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AppError {
+                code: "invalid_name",
+                message: "",
+            }),
+        ))?
+        .to_owned();
 
     if !verified_email {
         return Err((
             StatusCode::FORBIDDEN,
             Json(AppError {
-                code: "unverified_email".to_owned(),
-                message: "".to_owned(),
+                code: "unverified_email",
+                message: "",
             }),
         ));
     }
 
-    return Ok(email);
+    // Create user if not exists
+
+    let existed_user = users::Entity::find()
+        .filter(users::Column::Email.eq(&email))
+        .one(&app_state.conn)
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AppError {
+                    code: "create_user_error_1",
+                    message: "",
+                }),
+            )
+        })?;
+
+    if existed_user.is_none() {
+        // Create user
+        users::ActiveModel {
+            name: Set(name.clone()),
+            email: Set(email.clone()),
+            google_access_token: Set(access_token.to_owned()),
+            google_refresh_token: Set(refresh_token.to_owned()),
+            has_google_calendar_access: Set(has_calendar_access),
+            ..Default::default()
+        }
+        .save(&app_state.conn)
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AppError {
+                    code: "create_user_error_2",
+                    message: "",
+                }),
+            )
+        })?;
+    } else {
+        // Refresh tokens
+        let mut modified_user: users::ActiveModel = existed_user.unwrap().into();
+        modified_user.google_access_token = Set(access_token.to_owned());
+        modified_user.google_refresh_token = Set(refresh_token.to_owned());
+        modified_user.save(&app_state.conn).await.map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AppError {
+                    code: "refresh_token_error",
+                    message: "",
+                }),
+            )
+        })?;
+    }
+
+    // issue JWT token
+    let now = chrono::Utc::now();
+    let iat = now.timestamp() as usize;
+    let exp = (now + chrono::Duration::minutes(60 * 24 * 30 * 12)).timestamp() as usize;
+    let claims: TokenClaims = TokenClaims {
+        sub: email,
+        name: name,
+        exp,
+        iat,
+    };
+
+    let token = encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(
+            env::var("JWT_SECRET")
+                .expect("JWT_SECRET is not set in .env file")
+                .as_ref(),
+        ),
+    )
+    .unwrap();
+
+    return Ok(Redirect::to(
+        format!("{}?token={}", return_url, token).as_str(),
+    ));
 }
