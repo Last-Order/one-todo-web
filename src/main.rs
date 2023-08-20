@@ -3,11 +3,12 @@ mod api;
 use std::env;
 
 use api::{
+    jwt_auth,
     oauth::{login, oauth_callback},
-    todo::list,
+    todo::get_upcoming_events,
     AppState,
 };
-use axum::{routing::get, Router};
+use axum::{middleware, routing::get, Router};
 use sea_orm::Database;
 
 #[tokio::main]
@@ -28,7 +29,13 @@ async fn main() {
     // build our application with a single route
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
-        .route("/list", get(list))
+        .route(
+            "/list",
+            get(get_upcoming_events).route_layer(middleware::from_fn_with_state(
+                state.clone(),
+                jwt_auth::auth,
+            )),
+        )
         .route("/oauth/google/login", get(login))
         .route("/oauth/google/callback", get(oauth_callback))
         .with_state(state);

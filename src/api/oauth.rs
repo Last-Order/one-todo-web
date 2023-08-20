@@ -1,8 +1,6 @@
 use std::{collections::HashMap, env};
 
 use anyhow::anyhow;
-use chrono;
-use reqwest;
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -10,7 +8,7 @@ use axum::{
     Json,
 };
 use axum_macros::debug_handler;
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
+use chrono;
 use entity::{oauth2_state_storage, users};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use oauth2::{
@@ -18,6 +16,9 @@ use oauth2::{
     CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RevocationUrl, Scope,
     TokenResponse, TokenUrl,
 };
+use reqwest;
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
+use url;
 
 use super::{model::TokenClaims, AppError, AppState};
 
@@ -78,9 +79,9 @@ pub async fn login(
         .add_scope(Scope::new(
             "https://www.googleapis.com/auth/userinfo.profile".to_string(),
         ))
-        .add_scope(Scope::new(
-            "https://www.googleapis.com/auth/calendar".to_string(),
-        ))
+        // .add_scope(Scope::new(
+        //     "https://www.googleapis.com/auth/calendar".to_string(),
+        // ))
         .set_pkce_challenge(pkce_code_challenge)
         .add_extra_param("access_type", "offline")
         .add_extra_param("prompt", "consent")
@@ -200,9 +201,9 @@ pub async fn oauth_callback(
 
     // Get user info from Google
 
-    let url =
+    let google_token_exchange_url =
         "https://www.googleapis.com/oauth2/v2/userinfo?oauth_token=".to_owned() + access_token;
-    let body = reqwest::get(url)
+    let body = reqwest::get(google_token_exchange_url)
         .await
         .map_err(|_| {
             (
@@ -352,7 +353,17 @@ pub async fn oauth_callback(
     )
     .unwrap();
 
-    return Ok(Redirect::to(
-        format!("{}?token={}", return_url, token).as_str(),
-    ));
+    let redirect_url = url::Url::parse(&return_url).map_err(|_| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(AppError {
+                code: "invalid_return_url",
+                message: "",
+            }),
+        )
+    })?;
+
+    let final_url = format!("{}/{}", redirect_url, token);
+
+    return Ok(Redirect::to(final_url.as_str()));
 }

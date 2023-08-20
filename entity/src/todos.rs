@@ -8,11 +8,11 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub title: String,
-    #[sea_orm(column_type = "custom(\"MEDIUMTEXT\")", nullable)]
+    #[sea_orm(column_type = "Text", nullable)]
     pub description: Option<String>,
-    pub scheduled_start_time: Option<DateTimeUtc>,
-    pub scheduled_end_time: Option<DateTimeUtc>,
+    pub scheduled_time: Option<DateTimeUtc>,
     pub remind_time: Option<DateTimeUtc>,
+    pub user_id: i32,
     pub created_at: DateTimeUtc,
 }
 
