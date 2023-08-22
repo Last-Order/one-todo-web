@@ -8,8 +8,14 @@ use api::{
     todo::get_upcoming_events,
     AppState,
 };
-use axum::{middleware, routing::get, Router};
+use axum::{
+    http::{header, Method},
+    middleware,
+    routing::get,
+    Router,
+};
 use sea_orm::Database;
+use tower_http::cors::{Any, CorsLayer};
 
 #[tokio::main]
 async fn main() {
@@ -30,11 +36,17 @@ async fn main() {
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
         .route(
-            "/list",
+            "/upcoming",
             get(get_upcoming_events).route_layer(middleware::from_fn_with_state(
                 state.clone(),
                 jwt_auth::auth,
             )),
+        )
+        .layer(
+            CorsLayer::new()
+                .allow_methods([Method::GET, Method::POST])
+                .allow_origin(Any)
+                .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]),
         )
         .route("/oauth/google/login", get(login))
         .route("/oauth/google/callback", get(oauth_callback))

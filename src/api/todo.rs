@@ -6,7 +6,7 @@ use axum::{
 };
 use chrono::prelude::*;
 use entity::{prelude::*, todos, users};
-use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde::Deserialize;
 
 use super::{AppError, AppState};
@@ -58,6 +58,8 @@ pub async fn get_upcoming_events(
                 .add(todos::Column::UserId.eq(user_id))
                 .add(todos::Column::ScheduledTime.gte(start_of_day)),
         )
+        .order_by_asc(todos::Column::ScheduledTime)
+        .limit(50)
         .into_json()
         .all(&state.conn)
         .await

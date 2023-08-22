@@ -51,7 +51,7 @@ pub async fn auth<T>(
         (
             StatusCode::UNAUTHORIZED,
             Json(AppError {
-                code: "invalid_jwt",
+                code: "need_login",
                 message: "",
             }),
         )
