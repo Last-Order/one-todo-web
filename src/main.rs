@@ -5,13 +5,13 @@ use std::env;
 use api::{
     jwt_auth,
     oauth::{login, oauth_callback},
-    todo::get_upcoming_events,
+    todo::{get_upcoming_events, prepare_create_event},
     AppState,
 };
 use axum::{
     http::{header, Method},
     middleware,
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use sea_orm::Database;
@@ -34,14 +34,13 @@ async fn main() {
 
     // build our application with a single route
     let app = Router::new()
+        .route("/upcoming", get(get_upcoming_events))
+        .route("/prepare_create_event", post(prepare_create_event))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            jwt_auth::auth,
+        ))
         .route("/", get(|| async { "Hello, World!" }))
-        .route(
-            "/upcoming",
-            get(get_upcoming_events).route_layer(middleware::from_fn_with_state(
-                state.clone(),
-                jwt_auth::auth,
-            )),
-        )
         .layer(
             CorsLayer::new()
                 .allow_methods([Method::GET, Method::POST])

@@ -12,6 +12,7 @@ pub struct Model {
     pub description: Option<String>,
     pub scheduled_time: Option<DateTimeUtc>,
     pub remind_time: Option<DateTimeUtc>,
+    pub status: i32,
     pub user_id: i32,
     pub created_at: DateTimeUtc,
 }
