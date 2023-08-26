@@ -11,6 +11,7 @@ pub struct Model {
     pub start_time: DateTimeUtc,
     pub end_time: DateTimeUtc,
     pub r#type: i32,
+    pub quota: i32,
     pub created_at: DateTimeUtc,
 }
 
