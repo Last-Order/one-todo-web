@@ -7,3 +7,10 @@ pub struct TokenClaims {
     pub iat: usize,
     pub exp: usize,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum TodoStatus {
+    CREATED = 0,
+    DONE = 1,
+    DELETED = 2,
+}

@@ -7,10 +7,14 @@ use axum::{
 use chrono::{prelude::*, Duration};
 use entity::{todos, users};
 use regex::Regex;
-use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect,
+};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
-use super::{AppError, AppState};
+use super::{model::TodoStatus, AppError, AppState};
 use crate::services::{
     extract_history::{self, count_extract_history},
     openai,
@@ -36,7 +40,7 @@ pub async fn get_upcoming_events(
                 message: "",
             }),
         ))?
-        .parse::<DateTime<Utc>>()
+        .parse::<DateTime<Local>>()
         .map_err(|_| {
             (
                 StatusCode::BAD_REQUEST,
@@ -46,7 +50,8 @@ pub async fn get_upcoming_events(
                 }),
             )
         })?;
-    let start_of_day = Utc
+
+    let start_of_day = Local
         .with_ymd_and_hms(
             current_time.year(),
             current_time.month(),
@@ -56,12 +61,16 @@ pub async fn get_upcoming_events(
             0,
         )
         .unwrap();
+
+    dbg!(start_of_day);
+
     let user_id = user.id;
     let result = todos::Entity::find()
         .filter(
             Condition::all()
                 .add(todos::Column::UserId.eq(user_id))
-                .add(todos::Column::ScheduledTime.gte(start_of_day)),
+                .add(todos::Column::ScheduledTime.gte(start_of_day))
+                .add(todos::Column::Status.ne(TodoStatus::DELETED as i32)),
         )
         .order_by_asc(todos::Column::ScheduledTime)
         .limit(50)
@@ -81,7 +90,7 @@ pub async fn get_upcoming_events(
 }
 
 #[derive(Deserialize)]
-pub struct CreateEventPayload {
+pub struct PrepareCreateEventPayload {
     current_time: Option<String>,
     description: Option<String>,
 }
@@ -95,7 +104,7 @@ struct PrepareCreateEventResult {
 pub async fn prepare_create_event(
     app_state: State<AppState>,
     Extension(user): Extension<users::Model>,
-    extract::Json(params): extract::Json<CreateEventPayload>,
+    extract::Json(params): extract::Json<PrepareCreateEventPayload>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<AppError>)> {
     // parameter validation
     let current_time = params
@@ -144,13 +153,13 @@ pub async fn prepare_create_event(
     let mut quota = 10; // Free plan
 
     if subscription.is_some() {
-        quota = subscription.unwrap().quota;
+        quota = subscription.as_ref().unwrap().quota;
     }
 
     let extract_count = count_extract_history(
         &app_state,
         &user,
-        chrono::Utc::now() - Duration::seconds(60 * 60 * 24 * 31),
+        subscription.unwrap().start_time,
         chrono::Utc::now(),
     )
     .await
@@ -244,4 +253,123 @@ pub async fn prepare_create_event(
         name: event_name,
         event_time,
     }))
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CreateEventPayload {
+    event_name: Option<String>,
+    scheduled_time: Option<String>,
+    remind_time: Option<String>,
+    description: Option<String>,
+}
+
+pub async fn create_event(
+    app_state: State<AppState>,
+    Extension(user): Extension<users::Model>,
+    extract::Json(params): extract::Json<CreateEventPayload>,
+) -> Result<impl IntoResponse, (StatusCode, Json<AppError>)> {
+    let scheduled_time = params
+        .scheduled_time
+        .ok_or((
+            StatusCode::BAD_REQUEST,
+            Json(AppError {
+                code: "missing_scheduled_time",
+                message: "",
+            }),
+        ))?
+        .parse::<DateTime<Utc>>()
+        .map_err(|_| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(AppError {
+                    code: "invalid_time",
+                    message: "",
+                }),
+            )
+        })?;
+
+    let remind_time = params
+        .remind_time
+        .ok_or((
+            StatusCode::BAD_REQUEST,
+            Json(AppError {
+                code: "missing_remind_time",
+                message: "",
+            }),
+        ))?
+        .parse::<DateTime<Utc>>()
+        .map_err(|_| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(AppError {
+                    code: "invalid_time",
+                    message: "",
+                }),
+            )
+        })?;
+
+    if scheduled_time - remind_time < Duration::seconds(0) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AppError {
+                code: "invalid_remind_time",
+                message: "Reminder time cannot be later than the event time.",
+            }),
+        ));
+    }
+
+    let event_name = params.event_name.ok_or((
+        StatusCode::BAD_REQUEST,
+        Json(AppError {
+            code: "missing_event_name",
+            message: "A name of the event is required.",
+        }),
+    ))?;
+
+    let event_description = params.description.ok_or((
+        StatusCode::BAD_REQUEST,
+        Json(AppError {
+            code: "missing_event_description",
+            message: "A description of the event is required.",
+        }),
+    ))?;
+
+    if event_description.len() > 300 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AppError {
+                code: "description_too_long",
+                message: "The description must 300 characters or fewer.",
+            }),
+        ));
+    }
+
+    let result = todos::ActiveModel {
+        user_id: Set(user.id),
+        event_name: Set(event_name),
+        description: Set(Some(event_description)),
+        scheduled_time: Set(Some(scheduled_time)),
+        remind_time: Set(Some(remind_time)),
+        status: Set(TodoStatus::CREATED as i32),
+        ..Default::default()
+    }
+    .insert(&app_state.conn)
+    .await
+    .map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AppError {
+                code: "database_error",
+                message: "Failed to create event. Please try again later.",
+            }),
+        )
+    })?;
+
+    Ok(Json(json!({
+        "event_name": result.event_name,
+        "description": result.description,
+        "scheduled_time": format!("{:?}", result.scheduled_time.unwrap()),
+        "remind_time": format!("{:?}", result.remind_time.unwrap()),
+        "status": result.status
+    })))
 }
