@@ -90,6 +90,88 @@ pub async fn get_upcoming_events(
 }
 
 #[derive(Deserialize)]
+pub struct UpdateEventStatusPayload {
+    id: Option<i32>,
+    status: Option<i32>,
+}
+
+pub async fn update_event_status(
+    state: State<AppState>,
+    Query(params): Query<UpdateEventStatusPayload>,
+    Extension(user): Extension<users::Model>,
+) -> Result<impl IntoResponse, (StatusCode, Json<AppError>)> {
+    let event_id = params.id.ok_or((
+        StatusCode::BAD_REQUEST,
+        Json(AppError {
+            code: "missing_id",
+            message: "",
+        }),
+    ))?;
+
+    let status: TodoStatus = params
+        .status
+        .ok_or((
+            StatusCode::BAD_REQUEST,
+            Json(AppError {
+                code: "missing_id",
+                message: "",
+            }),
+        ))?
+        .try_into()
+        .map_err(|err| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(AppError {
+                    code: err,
+                    message: "",
+                }),
+            )
+        })?;
+
+    let event = todos::Entity::find()
+        .filter(
+            Condition::all()
+                .add(todos::Column::Id.eq(event_id))
+                .add(todos::Column::UserId.eq(user.id)),
+        )
+        // .into_json()
+        .one(&state.conn)
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AppError {
+                    code: "database_error",
+                    message: "",
+                }),
+            )
+        })?
+        .ok_or((
+            StatusCode::NOT_FOUND,
+            Json(AppError {
+                code: "event_not_found",
+                message: "",
+            }),
+        ))?;
+
+    let mut event: todos::ActiveModel = event.into();
+
+    event.status = Set(status as i32);
+
+    event.save(&state.conn).await.map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AppError {
+                code: "database_error",
+                message: "",
+            }),
+        )
+    })?;
+
+    Ok("")
+}
+
+#[derive(Deserialize)]
 pub struct PrepareCreateEventPayload {
     current_time: Option<String>,
     description: Option<String>,
