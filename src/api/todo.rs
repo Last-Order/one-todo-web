@@ -97,9 +97,10 @@ pub struct UpdateEventStatusPayload {
 
 pub async fn update_event_status(
     state: State<AppState>,
-    Query(params): Query<UpdateEventStatusPayload>,
     Extension(user): Extension<users::Model>,
+    extract::Json(params): extract::Json<UpdateEventStatusPayload>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<AppError>)> {
+    // return Err((StatusCode::BAD_GATEWAY, Json(AppError { code: "error", message: "message" })));
     let event_id = params.id.ok_or((
         StatusCode::BAD_REQUEST,
         Json(AppError {
@@ -179,8 +180,8 @@ pub struct PrepareCreateEventPayload {
 
 #[derive(Serialize, Deserialize)]
 struct PrepareCreateEventResult {
-    name: String,
-    event_time: DateTime<Utc>,
+    event_name: String,
+    scheduled_time: DateTime<Utc>,
 }
 
 pub async fn prepare_create_event(
@@ -198,7 +199,7 @@ pub async fn prepare_create_event(
                 message: "",
             }),
         ))?
-        .parse::<DateTime<Utc>>()
+        .parse::<DateTime<Local>>()
         .map_err(|_| {
             (
                 StatusCode::BAD_REQUEST,
@@ -233,15 +234,17 @@ pub async fn prepare_create_event(
         .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, Json(err)))?;
 
     let mut quota = 10; // Free plan
+    let mut period_start_time = chrono::Utc::now() - Duration::seconds(60 * 60 * 24 * 31);
 
     if subscription.is_some() {
         quota = subscription.as_ref().unwrap().quota;
+        period_start_time = subscription.unwrap().start_time;
     }
 
     let extract_count = count_extract_history(
         &app_state,
         &user,
-        subscription.unwrap().start_time,
+        period_start_time,
         chrono::Utc::now(),
     )
     .await
@@ -332,8 +335,8 @@ pub async fn prepare_create_event(
         .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, Json(err)))?;
 
     Ok(Json(PrepareCreateEventResult {
-        name: event_name,
-        event_time,
+        event_name,
+        scheduled_time: event_time,
     }))
 }
 
