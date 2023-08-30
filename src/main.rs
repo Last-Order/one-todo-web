@@ -6,7 +6,8 @@ use std::env;
 use api::{
     jwt_auth,
     oauth::{login, oauth_callback},
-    todo::{get_upcoming_events, prepare_create_event, update_event_status},
+    todo::{create_event, get_upcoming_events, prepare_create_event, update_event_status},
+    user::get_user_profile,
     AppState,
 };
 use axum::{
@@ -35,9 +36,11 @@ async fn main() {
 
     // build our application with a single route
     let app = Router::new()
+        .route("/user/profile", get(get_user_profile))
         .route("/upcoming", get(get_upcoming_events))
         .route("/update_event_status", post(update_event_status))
         .route("/prepare_create_event", post(prepare_create_event))
+        .route("/create_event", post(create_event))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             jwt_auth::auth,

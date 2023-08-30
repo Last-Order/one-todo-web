@@ -1,6 +1,7 @@
 pub mod jwt_auth;
 pub mod oauth;
 pub mod todo;
+pub mod user;
 
 pub mod model;
 
