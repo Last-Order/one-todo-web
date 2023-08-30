@@ -256,7 +256,7 @@ pub async fn oauth_callback(
         }),
     ))?;
 
-    let name = body["name"]
+    let first_name = body["family_name"]
         .take()
         .as_str()
         .ok_or((
@@ -267,6 +267,9 @@ pub async fn oauth_callback(
             }),
         ))?
         .to_owned();
+
+    let last_name = body["given_name"].take().as_str().unwrap_or("").to_owned();
+    let avatar = body["picture"].take().as_str().unwrap_or("").to_owned();
 
     if !verified_email {
         return Err((
@@ -297,7 +300,9 @@ pub async fn oauth_callback(
     if existed_user.is_none() {
         // Create user
         users::ActiveModel {
-            name: Set(name.clone()),
+            first_name: Set(first_name.clone()),
+            last_name: Set(last_name.clone()),
+            avatar: Set(avatar.clone()),
             email: Set(email.clone()),
             google_access_token: Set(access_token.to_owned()),
             google_refresh_token: Set(refresh_token.to_owned()),
@@ -337,7 +342,7 @@ pub async fn oauth_callback(
     let exp = (now + chrono::Duration::minutes(60 * 24 * 30 * 12)).timestamp() as usize;
     let claims: TokenClaims = TokenClaims {
         sub: email,
-        name: name,
+        name: first_name,
         exp,
         iat,
     };

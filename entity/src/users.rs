@@ -8,7 +8,10 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub email: String,
-    pub name: String,
+    pub first_name: String,
+    pub last_name: String,
+    #[sea_orm(column_type = "Text")]
+    pub avatar: String,
     #[sea_orm(column_type = "Text")]
     pub google_access_token: String,
     #[sea_orm(column_type = "Text")]

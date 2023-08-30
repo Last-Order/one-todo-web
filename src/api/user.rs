@@ -59,7 +59,9 @@ pub async fn get_user_profile(
         .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, Json(err)))?;
 
     Ok(Json(json!({
-        "name": user.name,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "avatar": user.avatar,
         "subscription": json!({
             "quota": quota,
             "used_count": extract_count
