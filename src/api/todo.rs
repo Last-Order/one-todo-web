@@ -246,7 +246,7 @@ pub async fn prepare_create_event(
             .await
             .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, Json(err)))?;
 
-    if quota < extract_count {
+    if quota <= extract_count {
         return Err((
             StatusCode::FORBIDDEN,
             Json(AppError {
