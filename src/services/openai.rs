@@ -9,6 +9,7 @@ use crate::api::AppError;
 struct GetCompletionPayload {
     model: String,
     messages: Vec<Message>,
+    temperature: f32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -31,6 +32,7 @@ pub async fn get_completion(prompt: &str) -> Result<String, AppError> {
             role: "user".to_owned(),
             content: prompt.to_owned(),
         }],
+        temperature: 0.2,
     };
 
     let response = client
@@ -87,6 +89,8 @@ pub async fn get_completion(prompt: &str) -> Result<String, AppError> {
             message: "",
         })?
         .to_owned();
+
+    dbg!(&openai_result);
 
     Ok(openai_result)
 }
