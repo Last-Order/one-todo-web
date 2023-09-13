@@ -16,9 +16,9 @@ use serde_json::json;
 
 use super::{model::TodoStatus, AppError, AppState};
 use crate::services::{
-    extract_history::{self, count_extract_history},
+    extract_history::{self},
     openai,
-    subscription::get_valid_subscription,
+    subscription::get_user_quota_and_subscription,
 };
 #[derive(Deserialize)]
 pub struct GetUpcomingEventPayload {
@@ -169,7 +169,7 @@ pub async fn update_event_status(
         )
     })?;
 
-    Ok("")
+    Ok(Json(json!({})))
 }
 
 #[derive(Deserialize)]
@@ -227,26 +227,14 @@ pub async fn prepare_create_event(
         ));
     }
 
-    // check user subscription
-
-    let subscription = get_valid_subscription(&app_state, &user)
+    // check user subscriptions
+    let quota_and_subscription_info = get_user_quota_and_subscription(&app_state, &user)
         .await
         .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, Json(err)))?;
 
-    let mut quota = 10; // Free plan
-    let mut period_start_time = chrono::Utc::now() - Duration::seconds(60 * 60 * 24 * 31);
-
-    if subscription.is_some() {
-        quota = subscription.as_ref().unwrap().quota;
-        period_start_time = subscription.unwrap().start_time;
-    }
-
-    let extract_count =
-        count_extract_history(&app_state, &user, period_start_time, chrono::Utc::now())
-            .await
-            .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, Json(err)))?;
-
-    if quota <= extract_count {
+    if quota_and_subscription_info.quota_info.quota
+        <= quota_and_subscription_info.quota_info.used_count
+    {
         return Err((
             StatusCode::FORBIDDEN,
             Json(AppError {
