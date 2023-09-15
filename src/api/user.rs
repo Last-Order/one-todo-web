@@ -4,7 +4,7 @@ use serde_json::json;
 
 use crate::services::subscription::get_user_quota_and_subscription;
 
-use super::{AppError, AppState};
+use super::{constants::SubscriptionType, AppError, AppState};
 
 pub async fn get_user_profile(
     state: State<AppState>,
@@ -18,11 +18,28 @@ pub async fn get_user_profile(
 
     if user_quota_and_subscription.subscription.is_some() {
         let subscription = user_quota_and_subscription.subscription.unwrap();
+        let subscription_type: SubscriptionType = subscription.r#type.try_into().map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AppError {
+                    code: "invalid_subscription_type",
+                    message: "Invalid subscription type.",
+                }),
+            )
+        })?;
+        let subscription_name: String = subscription_type.into();
+
         subscription_info = json!({
-            "type": subscription.r#type,
+            "subscription_name": subscription_name,
+            "subscription_type": subscription.r#type,
             "start_time": subscription.start_time,
             "end_time": subscription.end_time
-        })
+        });
+    } else {
+        let subscription_name: String = SubscriptionType::Free.into();
+        subscription_info = json!({
+            "subscription_name": subscription_name,
+        });
     }
 
     Ok(Json(json!({

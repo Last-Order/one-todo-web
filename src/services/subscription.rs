@@ -2,7 +2,6 @@ use axum::extract::State;
 use chrono::Duration;
 use entity::{user_subscriptions, users};
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
-use serde::{Deserialize, Serialize};
 
 use crate::api::{AppError, AppState};
 

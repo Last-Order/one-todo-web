@@ -14,7 +14,7 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use super::{model::TodoStatus, AppError, AppState};
+use super::{constants::TodoStatus, AppError, AppState};
 use crate::services::{
     extract_history::{self},
     openai,
@@ -70,7 +70,7 @@ pub async fn get_upcoming_events(
             Condition::all()
                 .add(todos::Column::UserId.eq(user_id))
                 .add(todos::Column::ScheduledTime.gte(start_of_day))
-                .add(todos::Column::Status.ne(TodoStatus::DELETED as i32)),
+                .add(todos::Column::Status.ne(TodoStatus::Deleted as i32)),
         )
         .order_by_asc(todos::Column::ScheduledTime)
         .limit(50)
@@ -419,7 +419,7 @@ pub async fn create_event(
         description: Set(Some(event_description)),
         scheduled_time: Set(Some(scheduled_time)),
         remind_time: Set(Some(remind_time)),
-        status: Set(TodoStatus::CREATED as i32),
+        status: Set(TodoStatus::Created as i32),
         ..Default::default()
     }
     .insert(&app_state.conn)
