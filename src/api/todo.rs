@@ -9,7 +9,7 @@ use entity::{todos, users};
 use regex::Regex;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition, EntityTrait, QueryFilter,
-    QueryOrder, QuerySelect,
+    QueryOrder, QuerySelect, TryIntoModel,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -440,5 +440,152 @@ pub async fn create_event(
         "scheduled_time": format!("{:?}", result.scheduled_time.unwrap()),
         "remind_time": format!("{:?}", result.remind_time.unwrap()),
         "status": result.status
+    })))
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UpdateEventPayload {
+    id: Option<i32>,
+    event_name: Option<String>,
+    scheduled_time: Option<String>,
+    remind_time: Option<String>,
+    description: Option<String>,
+}
+
+pub async fn update_event(
+    app_state: State<AppState>,
+    Extension(user): Extension<users::Model>,
+    extract::Json(params): extract::Json<UpdateEventPayload>,
+) -> Result<impl IntoResponse, (StatusCode, Json<AppError>)> {
+    let id = params.id.ok_or((
+        StatusCode::BAD_REQUEST,
+        Json(AppError {
+            code: "missing_event_id",
+            message: "Missing event id.",
+        }),
+    ))?;
+
+    let scheduled_time = params
+        .scheduled_time
+        .ok_or((
+            StatusCode::BAD_REQUEST,
+            Json(AppError {
+                code: "missing_scheduled_time",
+                message: "",
+            }),
+        ))?
+        .parse::<DateTime<Utc>>()
+        .map_err(|_| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(AppError {
+                    code: "invalid_time",
+                    message: "",
+                }),
+            )
+        })?;
+
+    let remind_time = params
+        .remind_time
+        .ok_or((
+            StatusCode::BAD_REQUEST,
+            Json(AppError {
+                code: "missing_remind_time",
+                message: "",
+            }),
+        ))?
+        .parse::<DateTime<Utc>>()
+        .map_err(|_| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(AppError {
+                    code: "invalid_time",
+                    message: "",
+                }),
+            )
+        })?;
+
+    let event_name = params.event_name.ok_or((
+        StatusCode::BAD_REQUEST,
+        Json(AppError {
+            code: "missing_event_name",
+            message: "A name of the event is required.",
+        }),
+    ))?;
+
+    let event_description = params.description.ok_or((
+        StatusCode::BAD_REQUEST,
+        Json(AppError {
+            code: "missing_event_description",
+            message: "A description of the event is required.",
+        }),
+    ))?;
+
+    if scheduled_time - remind_time < Duration::seconds(0) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AppError {
+                code: "invalid_remind_time",
+                message: "Reminder time cannot be later than the event time.",
+            }),
+        ));
+    }
+
+    let todo = todos::Entity::find()
+        .filter(todos::Column::Id.eq(id))
+        .one(&app_state.conn)
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AppError {
+                    code: "database_error",
+                    message: "Please try again later.",
+                }),
+            )
+        })?
+        .ok_or((
+            StatusCode::NOT_FOUND,
+            Json(AppError {
+                code: "event_not_found",
+                message: "Event not found.",
+            }),
+        ))?;
+
+    let mut modified_todo: todos::ActiveModel = todo.into();
+    modified_todo.event_name = Set(event_name);
+    modified_todo.description = Set(Some(event_description));
+    modified_todo.scheduled_time = Set(Some(scheduled_time));
+    modified_todo.remind_time = Set(Some(remind_time));
+
+    let result = modified_todo
+        .save(&app_state.conn)
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AppError {
+                    code: "database_error",
+                    message: "Please try again later.",
+                }),
+            )
+        })?
+        .try_into_model()
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AppError {
+                    code: "database_error_serialization",
+                    message: "Please try again later.",
+                }),
+            )
+        })?;
+
+    Ok(Json(json!({
+        "id": result.id,
+        "event_name": result.event_name,
+        "description": result.description,
+        "scheduled_time": format!("{:?}", result.scheduled_time.unwrap()),
+        "remind_time": format!("{:?}", result.remind_time.unwrap()),
     })))
 }

@@ -41,8 +41,8 @@ impl TryFrom<i32> for SubscriptionType {
 impl From<SubscriptionType> for String {
     fn from(value: SubscriptionType) -> Self {
         match value {
-            SubscriptionType::Free => String::from("Free plan"),
-            SubscriptionType::Pro => String::from("Pro plan"),
+            SubscriptionType::Free => String::from("Free Plan"),
+            SubscriptionType::Pro => String::from("Pro Plan"),
         }
     }
 }
