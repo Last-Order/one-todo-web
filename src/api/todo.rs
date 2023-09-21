@@ -62,8 +62,6 @@ pub async fn get_upcoming_events(
         )
         .unwrap();
 
-    dbg!(start_of_day);
-
     let user_id = user.id;
     let result = todos::Entity::find()
         .filter(
@@ -100,7 +98,6 @@ pub async fn update_event_status(
     Extension(user): Extension<users::Model>,
     extract::Json(params): extract::Json<UpdateEventStatusPayload>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<AppError>)> {
-    // return Err((StatusCode::BAD_GATEWAY, Json(AppError { code: "error", message: "message" })));
     let event_id = params.id.ok_or((
         StatusCode::BAD_REQUEST,
         Json(AppError {
@@ -552,11 +549,107 @@ pub async fn update_event(
             }),
         ))?;
 
+    if todo.user_id != user.id {
+        // permission check
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(AppError {
+                code: "event_not_found",
+                message: "Event not found.",
+            }),
+        ));
+    }
+
     let mut modified_todo: todos::ActiveModel = todo.into();
     modified_todo.event_name = Set(event_name);
     modified_todo.description = Set(Some(event_description));
     modified_todo.scheduled_time = Set(Some(scheduled_time));
     modified_todo.remind_time = Set(Some(remind_time));
+
+    let result = modified_todo
+        .save(&app_state.conn)
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AppError {
+                    code: "database_error",
+                    message: "Please try again later.",
+                }),
+            )
+        })?
+        .try_into_model()
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AppError {
+                    code: "database_error_serialization",
+                    message: "Please try again later.",
+                }),
+            )
+        })?;
+
+    Ok(Json(json!({
+        "id": result.id,
+        "event_name": result.event_name,
+        "description": result.description,
+        "scheduled_time": format!("{:?}", result.scheduled_time.unwrap()),
+        "remind_time": format!("{:?}", result.remind_time.unwrap()),
+    })))
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteEventPayload {
+    id: Option<i32>,
+}
+
+pub async fn delete_event(
+    app_state: State<AppState>,
+    Extension(user): Extension<users::Model>,
+    extract::Json(params): extract::Json<DeleteEventPayload>,
+) -> Result<impl IntoResponse, (StatusCode, Json<AppError>)> {
+    let id = params.id.ok_or((
+        StatusCode::BAD_REQUEST,
+        Json(AppError {
+            code: "missing_event_id",
+            message: "Missing event id.",
+        }),
+    ))?;
+
+    let todo = todos::Entity::find()
+        .filter(todos::Column::Id.eq(id))
+        .one(&app_state.conn)
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AppError {
+                    code: "database_error",
+                    message: "Please try again later.",
+                }),
+            )
+        })?
+        .ok_or((
+            StatusCode::NOT_FOUND,
+            Json(AppError {
+                code: "event_not_found",
+                message: "Event not found.",
+            }),
+        ))?;
+
+    if todo.user_id != user.id {
+        // permission check
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(AppError {
+                code: "event_not_found",
+                message: "Event not found.",
+            }),
+        ));
+    }
+
+    let mut modified_todo: todos::ActiveModel = todo.into();
+    modified_todo.status = Set(TodoStatus::Deleted as i32);
 
     let result = modified_todo
         .save(&app_state.conn)

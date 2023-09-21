@@ -7,7 +7,8 @@ use api::{
     jwt_auth,
     oauth::{login, oauth_callback},
     todo::{
-        create_event, get_upcoming_events, prepare_create_event, update_event, update_event_status,
+        create_event, delete_event, get_upcoming_events, prepare_create_event, update_event,
+        update_event_status,
     },
     user::get_user_profile,
     AppState,
@@ -44,6 +45,7 @@ async fn main() {
         .route("/event/prepare_create", post(prepare_create_event))
         .route("/event/create", post(create_event))
         .route("/event/update", post(update_event))
+        .route("/event/delete", post(delete_event))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             jwt_auth::auth,
