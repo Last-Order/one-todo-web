@@ -62,7 +62,7 @@ pub async fn get_user_quota_and_subscription(
         .await
         .map_err(|_| AppError {
             code: "database_error",
-            message: "",
+            message: "Please try again later.",
         })?;
 
     let mut quota = 10; // Free plan

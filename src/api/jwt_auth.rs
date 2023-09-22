@@ -62,7 +62,8 @@ pub async fn auth<T>(
         .filter(users::Column::Email.eq(&claims.sub))
         .one(&app_state.conn)
         .await
-        .map_err(|_| {
+        .map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {

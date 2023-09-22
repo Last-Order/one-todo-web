@@ -75,7 +75,8 @@ pub async fn get_upcoming_events(
         .into_json()
         .all(&state.conn)
         .await
-        .map_err(|_| {
+        .map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
@@ -135,12 +136,13 @@ pub async fn update_event_status(
         // .into_json()
         .one(&state.conn)
         .await
-        .map_err(|_| {
+        .map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
                     code: "database_error",
-                    message: "",
+                    message: "Failed to update event status.",
                 }),
             )
         })?
@@ -156,12 +158,13 @@ pub async fn update_event_status(
 
     event.status = Set(status as i32);
 
-    event.save(&state.conn).await.map_err(|_| {
+    event.save(&state.conn).await.map_err(|err| {
+        sentry::capture_error(&err);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AppError {
                 code: "database_error",
-                message: "",
+                message: "Failed to update event status.",
             }),
         )
     })?;
@@ -245,9 +248,10 @@ pub async fn prepare_create_event(
 
     let prompt = format!("Your task is to extract event information from the following text. Your answer must include event_time, which is the start time of the event, must in ISO format such as \"2023-01-01T20:00:00Z\" and name which is the name of the event. Remember, the time now is: {}. Keep the output timezone same as current time. If a relative time is provided, you should infer it from the current time, If the time exceed 24:00, treat it as the 30時間制 in japan. For example, 26:00 means 2:00 next day. If both start time and end time are provided, use the start time. Your answer must be provided in JSON format and do not include anything else. For example, {{\"name\": \"Event Name\", \"event_time\": \"2023-01-01T20:00:00Z\"}}. Your answer must be correct and clear. Do not provide any explanation or errors. The text you need to process is: {}", format!("{:?}", current_time), event_description);
 
-    let openai_result = openai::get_completion(&prompt)
-        .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, Json(err)))?;
+    let openai_result = openai::get_completion(&prompt).await.map_err(|err| {
+        sentry::capture_error(&err);
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
+    })?;
 
     let result = openai_result.replace("\n", "");
 
@@ -262,7 +266,8 @@ pub async fn prepare_create_event(
         .to_owned();
 
     let parsed_result: serde_json::Value =
-        serde_json::from_str(filtered_result.as_str()).map_err(|_| {
+        serde_json::from_str(filtered_result.as_str()).map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
@@ -313,7 +318,10 @@ pub async fn prepare_create_event(
 
     extract_history::record_extract_history(&app_state, &user, &prompt)
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, Json(err)))?;
+        .map_err(|err| {
+            sentry::capture_error(&err);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
+        })?;
 
     Ok(Json(PrepareCreateEventResult {
         event_name,
@@ -421,7 +429,8 @@ pub async fn create_event(
     }
     .insert(&app_state.conn)
     .await
-    .map_err(|_| {
+    .map_err(|err| {
+        sentry::capture_error(&err);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AppError {
@@ -532,12 +541,13 @@ pub async fn update_event(
         .filter(todos::Column::Id.eq(id))
         .one(&app_state.conn)
         .await
-        .map_err(|_| {
+        .map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
                     code: "database_error",
-                    message: "Please try again later.",
+                    message: "Failed to update event. Please try again later.",
                 }),
             )
         })?
@@ -569,22 +579,24 @@ pub async fn update_event(
     let result = modified_todo
         .save(&app_state.conn)
         .await
-        .map_err(|_| {
+        .map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
                     code: "database_error",
-                    message: "Please try again later.",
+                    message: "Failed to update event. Please try again later.",
                 }),
             )
         })?
         .try_into_model()
-        .map_err(|_| {
+        .map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
                     code: "database_error_serialization",
-                    message: "Please try again later.",
+                    message: "Failed to update event. Please try again later.",
                 }),
             )
         })?;
@@ -620,7 +632,8 @@ pub async fn delete_event(
         .filter(todos::Column::Id.eq(id))
         .one(&app_state.conn)
         .await
-        .map_err(|_| {
+        .map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
@@ -651,10 +664,11 @@ pub async fn delete_event(
     let mut modified_todo: todos::ActiveModel = todo.into();
     modified_todo.status = Set(TodoStatus::Deleted as i32);
 
-    let result = modified_todo
+    let _ = modified_todo
         .save(&app_state.conn)
         .await
-        .map_err(|_| {
+        .map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
@@ -664,7 +678,8 @@ pub async fn delete_event(
             )
         })?
         .try_into_model()
-        .map_err(|_| {
+        .map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
@@ -674,11 +689,5 @@ pub async fn delete_event(
             )
         })?;
 
-    Ok(Json(json!({
-        "id": result.id,
-        "event_name": result.event_name,
-        "description": result.description,
-        "scheduled_time": format!("{:?}", result.scheduled_time.unwrap()),
-        "remind_time": format!("{:?}", result.remind_time.unwrap()),
-    })))
+    Ok(Json(json!({})))
 }

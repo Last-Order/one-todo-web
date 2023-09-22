@@ -45,15 +45,21 @@ pub async fn get_completion(prompt: &str) -> Result<String, AppError> {
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .send()
         .await
-        .map_err(|_| AppError {
-            code: "failed_to_get_completion",
-            message: "Please try again later",
+        .map_err(|err| {
+            sentry::capture_error(&err);
+            AppError {
+                code: "failed_to_get_completion",
+                message: "Please try again later",
+            }
         })?
         .text()
         .await
-        .map_err(|_| AppError {
-            code: "failed_to_parse_completion_response",
-            message: "Please try again later",
+        .map_err(|err| {
+            sentry::capture_error(&err);
+            AppError {
+                code: "failed_to_parse_completion_response",
+                message: "Please try again later",
+            }
         })?;
 
     let mut body: serde_json::Value =

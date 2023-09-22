@@ -6,7 +6,7 @@ pub mod user;
 pub mod constants;
 pub mod model;
 
-use std::fmt;
+use std::{error::Error, fmt};
 
 use sea_orm::DatabaseConnection;
 use serde::Serialize;
@@ -35,6 +35,12 @@ impl fmt::Debug for AppError {
             "AppError {{ code: {}, message: {} }}",
             self.code, self.message
         )
+    }
+}
+
+impl Error for AppError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
     }
 }
 

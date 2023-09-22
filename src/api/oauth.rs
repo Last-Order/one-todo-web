@@ -53,7 +53,6 @@ fn get_oauth_client() -> Result<BasicClient, anyhow::Error> {
     Ok(client)
 }
 
-#[debug_handler]
 pub async fn login(
     Query(mut params): Query<HashMap<String, String>>,
     State(state): State<AppState>,
@@ -86,14 +85,24 @@ pub async fn login(
         .add_extra_param("access_type", "offline")
         .add_extra_param("prompt", "consent")
         .url();
-    let result = oauth2_state_storage::ActiveModel {
+    let _ = oauth2_state_storage::ActiveModel {
         csrf_state: Set(csrf_state.secret().to_owned()),
         pkce_code_verifier: Set(pkce_code_verifier.secret().to_owned()),
         return_url: Set(return_url),
         ..Default::default()
     }
     .save(&state.conn)
-    .await;
+    .await
+    .map_err(|err| {
+        sentry::capture_error(&err);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AppError {
+                code: "login_save_token_error",
+                message: "Failed to login. Please try again later.",
+            }),
+        )
+    })?;
     Ok(Redirect::to(authorize_url.as_str()))
 }
 
@@ -131,12 +140,13 @@ pub async fn oauth_callback(
         .filter(oauth2_state_storage::Column::CsrfState.eq(state.secret()))
         .one(&app_state.conn)
         .await
-        .map_err(|_| {
+        .map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
                     code: "database_error",
-                    message: "",
+                    message: "Failed to login. Please try again.",
                 }),
             )
         })?
@@ -150,7 +160,8 @@ pub async fn oauth_callback(
 
     let pkce_code_verifier = PkceCodeVerifier::new(result.pkce_code_verifier);
     let return_url = result.return_url;
-    let oauth_client = get_oauth_client().map_err(|_| {
+    let oauth_client = get_oauth_client().map_err(|err| {
+        sentry::integrations::anyhow::capture_anyhow(&err);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AppError {
@@ -168,7 +179,8 @@ pub async fn oauth_callback(
             .request(http_client)
     })
     .await
-    .map_err(|_| {
+    .map_err(|err| {
+        sentry::capture_error(&err);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AppError {
@@ -177,7 +189,8 @@ pub async fn oauth_callback(
             }),
         )
     })?
-    .map_err(|_| {
+    .map_err(|err| {
+        sentry::capture_error(&err);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AppError {
@@ -205,18 +218,20 @@ pub async fn oauth_callback(
         "https://www.googleapis.com/oauth2/v2/userinfo?oauth_token=".to_owned() + access_token;
     let body = reqwest::get(google_token_exchange_url)
         .await
-        .map_err(|_| {
+        .map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
                     code: "get_userinfo_failed",
-                    message: "",
+                    message: "Failed to get user information. Please try again later.",
                 }),
             )
         })?
         .text()
         .await
-        .map_err(|_| {
+        .map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
@@ -226,7 +241,8 @@ pub async fn oauth_callback(
             )
         })?;
 
-    let mut body: serde_json::Value = serde_json::from_str(body.as_str()).map_err(|_| {
+    let mut body: serde_json::Value = serde_json::from_str(body.as_str()).map_err(|err| {
+        sentry::capture_error(&err);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AppError {
@@ -287,7 +303,8 @@ pub async fn oauth_callback(
         .filter(users::Column::Email.eq(&email))
         .one(&app_state.conn)
         .await
-        .map_err(|_| {
+        .map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
@@ -311,7 +328,8 @@ pub async fn oauth_callback(
         }
         .save(&app_state.conn)
         .await
-        .map_err(|_| {
+        .map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {
@@ -325,7 +343,8 @@ pub async fn oauth_callback(
         let mut modified_user: users::ActiveModel = existed_user.unwrap().into();
         modified_user.google_access_token = Set(access_token.to_owned());
         modified_user.google_refresh_token = Set(refresh_token.to_owned());
-        modified_user.save(&app_state.conn).await.map_err(|_| {
+        modified_user.save(&app_state.conn).await.map_err(|err| {
+            sentry::capture_error(&err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {

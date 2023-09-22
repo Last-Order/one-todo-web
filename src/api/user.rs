@@ -12,13 +12,20 @@ pub async fn get_user_profile(
 ) -> Result<impl IntoResponse, (StatusCode, Json<AppError>)> {
     let user_quota_and_subscription = get_user_quota_and_subscription(&state, &user)
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, Json(err)))?;
+        .map_err(|err| {
+            sentry::capture_error(&err);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
+        })?;
 
-    let mut subscription_info = json!({});
+    let subscription_info;
 
     if user_quota_and_subscription.subscription.is_some() {
         let subscription = user_quota_and_subscription.subscription.unwrap();
         let subscription_type: SubscriptionType = subscription.r#type.try_into().map_err(|_| {
+            sentry::capture_message(
+                "Failed to convert subscription type to text.",
+                sentry::Level::Error,
+            );
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AppError {

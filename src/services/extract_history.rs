@@ -20,9 +20,9 @@ pub async fn record_extract_history(
     }
     .save(&app_state.conn)
     .await
-    .map_err(|_| AppError {
-        code: "refresh_token_error",
-        message: "",
+    .map_err(|err| AppError {
+        code: "record_extract_history_error",
+        message: "Please try again later.",
     })?;
     Ok(())
 }
