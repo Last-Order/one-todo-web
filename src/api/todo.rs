@@ -441,6 +441,7 @@ pub async fn create_event(
     })?;
 
     Ok(Json(json!({
+        "id": result.id,
         "event_name": result.event_name,
         "description": result.description,
         "scheduled_time": format!("{:?}", result.scheduled_time.unwrap()),
