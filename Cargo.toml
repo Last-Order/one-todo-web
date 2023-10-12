@@ -17,6 +17,7 @@ sea-orm = { version = "0.12", features = [
 tokio = { version = "1.31.0", features = ["full"] }
 tower = "0.4.13"
 entity = { path = "./entity" }
+lemon_squeezy = { path = "./lemon_squeezy" }
 serde = "1.0.183"
 serde_json = "1.0.105"
 anyhow = "1.0.74"

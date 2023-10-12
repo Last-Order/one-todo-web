@@ -1,0 +1,15 @@
+[package]
+name = "lemon_squeezy"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "lemon_squeezy"
+path = "src/lib.rs"
+
+[dependencies]
+serde = "1.0.183"
+serde_json = "1.0.105"
+reqwest = { version = "0.11.18", features = ["json"] }
+anyhow = "1.0.74"

@@ -1109,6 +1109,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lemon_squeezy"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "reqwest",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.147"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1366,6 +1376,7 @@ dependencies = [
  "entity",
  "hyper",
  "jsonwebtoken",
+ "lemon_squeezy",
  "oauth2",
  "regex",
  "reqwest",

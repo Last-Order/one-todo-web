@@ -27,7 +27,7 @@ pub async fn get_completion(prompt: &str) -> Result<String, AppError> {
     let client = reqwest::Client::new();
 
     let request_payload = GetCompletionPayload {
-        model: "gpt-3.5-turbo".to_owned(),
+        model: "gpt-4".to_owned(),
         messages: vec![Message {
             role: "user".to_owned(),
             content: prompt.to_owned(),
