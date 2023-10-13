@@ -4,6 +4,7 @@ pub mod prelude;
 
 pub mod extract_history;
 pub mod oauth2_state_storage;
+pub mod orders;
 pub mod todos;
 pub mod user_subscriptions;
 pub mod users;

@@ -46,3 +46,25 @@ impl From<SubscriptionType> for String {
         }
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum OrderStatus {
+    Created = 0,
+    Finished = 1,
+    Cancelled = 2,
+    Timeout = 3,
+}
+
+impl TryFrom<i32> for OrderStatus {
+    type Error = &'static str;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(OrderStatus::Created),
+            1 => Ok(OrderStatus::Finished),
+            2 => Ok(OrderStatus::Cancelled),
+            4 => Ok(OrderStatus::Timeout),
+            _ => Err("Invalid order status"),
+        }
+    }
+}

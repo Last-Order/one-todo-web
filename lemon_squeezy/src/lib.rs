@@ -11,31 +11,37 @@ pub struct LemonSqueezy {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct GenerateCheckoutUrlParams {
+pub struct CreateOrderParams {
     pub email: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CreateCheckoutResponse {
-    data: CreateCheckoutResponseData,
-    links: CreateCheckoutResponseDataLinks,
+pub struct CreateOrderResponse {
+    data: CreateOrderResponseData,
+    links: CreateOrderResponseDataLinks,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CreateCheckoutResponseData {
+pub struct CreateOrderResponseData {
     id: String,
-    attributes: CreateCheckoutResponseDataAttributes,
+    attributes: CreateOrderResponseDataAttributes,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CreateCheckoutResponseDataLinks {
+pub struct CreateOrderResponseDataLinks {
     #[serde(rename = "self")]
     se_lf: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CreateCheckoutResponseDataAttributes {
+pub struct CreateOrderResponseDataAttributes {
     url: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CreateOrderResult {
+    pub checkout_url: String,
+    pub order_id: String,
 }
 
 impl LemonSqueezy {
@@ -59,10 +65,10 @@ impl LemonSqueezy {
         Self { client, headers }
     }
 
-    pub async fn generate_checkout_url(
+    pub async fn create_order(
         &self,
-        params: GenerateCheckoutUrlParams,
-    ) -> Result<String, anyhow::Error> {
+        params: CreateOrderParams,
+    ) -> Result<CreateOrderResult, anyhow::Error> {
         let url = format!("{}/checkouts", constants::API_HOST);
 
         let response = self
@@ -95,9 +101,12 @@ impl LemonSqueezy {
             .headers(self.headers.clone())
             .send()
             .await?
-            .json::<CreateCheckoutResponse>()
+            .json::<CreateOrderResponse>()
             .await?;
 
-        return Ok(String::from(response.data.attributes.url));
+        return Ok(CreateOrderResult {
+            checkout_url: response.data.attributes.url,
+            order_id: response.data.id,
+        });
     }
 }

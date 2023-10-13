@@ -1,11 +1,12 @@
 use std::env;
 
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Extension, Json};
-use entity::users;
-use lemon_squeezy::GenerateCheckoutUrlParams;
+use entity::{orders, users};
+use lemon_squeezy::CreateOrderParams;
+use sea_orm::{ActiveModelTrait, ActiveValue::Set};
 use serde_json::json;
 
-use super::{AppError, AppState};
+use super::{constants::OrderStatus, AppError, AppState};
 
 pub async fn crate_order(
     state: State<AppState>,
@@ -16,8 +17,9 @@ pub async fn crate_order(
     let client = lemon_squeezy::LemonSqueezy::new(
         env::var("LEMON_SQUEEZY_API_KEY").expect("LEMON_SQUEEZY_API_KEY is not set in .env file"),
     );
-    let checkout_url = client
-        .generate_checkout_url(GenerateCheckoutUrlParams { email: Some(email) })
+
+    let create_order_result = client
+        .create_order(CreateOrderParams { email: Some(email) })
         .await
         .map_err(|err| {
             sentry::integrations::anyhow::capture_anyhow(&err);
@@ -29,5 +31,27 @@ pub async fn crate_order(
                 }),
             )
         })?;
-    Ok(Json(json!({ "checkout_url": checkout_url })))
+
+    let new_order = orders::ActiveModel {
+        user_id: Set(user.id),
+        order_id: Set(create_order_result.order_id),
+        status: Set(OrderStatus::Created as i32),
+        ..Default::default()
+    };
+
+    let result = new_order.insert(&state.conn).await.map_err(|err| {
+        sentry::capture_error(&err);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AppError {
+                code: "database_error",
+                message: "Failed to create order. Please try again later.",
+            }),
+        )
+    })?;
+
+    Ok(Json(json!({
+        "checkout_url": create_order_result.checkout_url,
+        "order_status": result.status
+    })))
 }

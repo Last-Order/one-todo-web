@@ -2,6 +2,7 @@
 
 pub use super::extract_history::Entity as ExtractHistory;
 pub use super::oauth2_state_storage::Entity as Oauth2StateStorage;
+pub use super::orders::Entity as Orders;
 pub use super::todos::Entity as Todos;
 pub use super::user_subscriptions::Entity as UserSubscriptions;
 pub use super::users::Entity as Users;
