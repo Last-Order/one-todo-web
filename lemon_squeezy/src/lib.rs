@@ -13,6 +13,9 @@ pub struct LemonSqueezy {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CreateOrderParams {
     pub email: Option<String>,
+    pub store_id: i32,
+    pub variant_id: i32,
+    pub redirect_url: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -80,20 +83,23 @@ impl LemonSqueezy {
                     "attributes": {
                         "checkout_data": {
                             "email": params.email.unwrap_or(String::from("")),
+                        },
+                        "product_options": {
+                            "redirect_url": params.redirect_url,
                         }
                     },
                     "relationships": {
                         "store": {
-                        "data": {
-                            "type": "stores",
-                            "id": "43821"
-                        }
+                            "data": {
+                                "type": "stores",
+                                "id": format!("{}", params.store_id),
+                            }
                         },
                         "variant": {
-                        "data": {
-                            "type": "variants",
-                            "id": "138344"
-                        }
+                            "data": {
+                                "type": "variants",
+                                "id": format!("{}", params.variant_id)
+                            }
                         }
                     }
                 }

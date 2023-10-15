@@ -53,6 +53,11 @@ fn main() {
 
             // build our application with a single route
             let app = Router::new()
+                .route(
+                    "/webhook/lemonsqueezy",
+                    post(|| async { "It works" })
+                        .layer(middleware::from_fn(lemon_squeezy_webhook_auth::auth)),
+                )
                 .route("/user/profile", get(get_user_profile))
                 .route("/event/upcoming", get(get_upcoming_events))
                 .route("/event/update_status", post(update_event_status))
@@ -72,8 +77,6 @@ fn main() {
                         .allow_origin(Any)
                         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]),
                 )
-                .route("/webhook/lemonsqueezy", post(|| async { "It works" }))
-                .layer(middleware::from_fn(lemon_squeezy_webhook_auth::auth))
                 .route("/oauth/google/login", get(login))
                 .route("/oauth/google/callback", get(oauth_callback))
                 .with_state(state);

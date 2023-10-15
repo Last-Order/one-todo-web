@@ -8,7 +8,10 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub order_id: String,
+    pub internal_order_id: String,
     pub user_id: i32,
+    #[sea_orm(column_type = "Text")]
+    pub redirect_url: String,
     pub status: i32,
     pub created_at: DateTimeUtc,
 }

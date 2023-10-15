@@ -34,10 +34,9 @@ fn get_oauth_client() -> Result<BasicClient, anyhow::Error> {
     let token_url = TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
         .map_err(|_| anyhow!("OAuth: invalid token endpoint URL"))?;
 
-    let redirect_url = RedirectUrl::new(
-        env::var("GOOGLE_RETURN_URL").expect("GOOGLE_RETURN_URL is not set in .env file"),
-    )
-    .map_err(|_| anyhow!("OAuth: invalid redirect URL"))?;
+    let app_endpoint = env::var("APP_ENDPOINT").expect("APP_ENDPOINT is not set in .env file");
+    let redirect_url = RedirectUrl::new(format!("{}/oauth/google/callback", app_endpoint))
+        .map_err(|_| anyhow!("OAuth: invalid redirect URL"))?;
 
     let revocation_url = RevocationUrl::new("https://oauth2.googleapis.com/revoke".to_string())
         .map_err(|_| anyhow!("OAuth: invalid revocation endpoint URL"))?;
