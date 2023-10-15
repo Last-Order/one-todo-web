@@ -1,10 +1,10 @@
 mod api;
+mod middlewares;
 mod services;
 
 use std::env;
 
 use api::{
-    jwt_auth,
     oauth::{login, oauth_callback},
     order::crate_order,
     todo::{
@@ -20,6 +20,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use middlewares::{jwt_auth, lemon_squeezy_webhook_auth};
 use sea_orm::Database;
 use tower_http::cors::{Any, CorsLayer};
 
@@ -71,6 +72,8 @@ fn main() {
                         .allow_origin(Any)
                         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]),
                 )
+                .route("/webhook/lemonsqueezy", post(|| async { "It works" }))
+                .layer(middleware::from_fn(lemon_squeezy_webhook_auth::auth))
                 .route("/oauth/google/login", get(login))
                 .route("/oauth/google/callback", get(oauth_callback))
                 .with_state(state);

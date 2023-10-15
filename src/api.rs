@@ -1,4 +1,3 @@
-pub mod jwt_auth;
 pub mod oauth;
 pub mod order;
 pub mod todo;

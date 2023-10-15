@@ -11,7 +11,7 @@ use entity::users;
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use super::{model::TokenClaims, AppError, AppState};
+use crate::api::{model::TokenClaims, AppError, AppState};
 
 pub async fn auth<T>(
     State(app_state): State<AppState>,
