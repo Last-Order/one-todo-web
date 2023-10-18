@@ -1,6 +1,8 @@
+use anyhow::anyhow;
 use reqwest::header::{HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use serde_qs;
 
 pub mod constants;
 
@@ -8,43 +10,6 @@ pub mod constants;
 pub struct LemonSqueezy {
     client: reqwest::Client,
     headers: HeaderMap,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CreateOrderParams {
-    pub email: Option<String>,
-    pub store_id: i32,
-    pub variant_id: i32,
-    pub redirect_url: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CreateOrderResponse {
-    data: CreateOrderResponseData,
-    links: CreateOrderResponseDataLinks,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CreateOrderResponseData {
-    id: String,
-    attributes: CreateOrderResponseDataAttributes,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CreateOrderResponseDataLinks {
-    #[serde(rename = "self")]
-    se_lf: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CreateOrderResponseDataAttributes {
-    url: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CreateOrderResult {
-    pub checkout_url: String,
-    pub order_id: String,
 }
 
 impl LemonSqueezy {
@@ -67,11 +32,53 @@ impl LemonSqueezy {
 
         Self { client, headers }
     }
+}
 
-    pub async fn create_order(
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CreateCheckoutParams {
+    pub email: Option<String>,
+    pub store_id: i32,
+    pub variant_id: i32,
+    pub redirect_url: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CreateCheckoutResponse {
+    data: CheckoutObject,
+    links: CheckoutLinks,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CheckoutObject {
+    id: String,
+    attributes: CheckoutAttributes,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CheckoutLinks {
+    #[serde(rename = "self")]
+    se_lf: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CheckoutAttributes {
+    url: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CreateCheckoutResult {
+    pub checkout_url: String,
+    pub order_id: String,
+}
+
+impl LemonSqueezy {
+    /**
+     * 创建订单
+     */
+    pub async fn create_checkout(
         &self,
-        params: CreateOrderParams,
-    ) -> Result<CreateOrderResult, anyhow::Error> {
+        params: CreateCheckoutParams,
+    ) -> Result<CreateCheckoutResult, anyhow::Error> {
         let url = format!("{}/checkouts", constants::API_HOST);
 
         let response = self
@@ -107,12 +114,50 @@ impl LemonSqueezy {
             .headers(self.headers.clone())
             .send()
             .await?
-            .json::<CreateOrderResponse>()
+            .json::<CreateCheckoutResponse>()
             .await?;
 
-        return Ok(CreateOrderResult {
+        return Ok(CreateCheckoutResult {
             checkout_url: response.data.attributes.url,
             order_id: response.data.id,
         });
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetSubscriptionsParams {
+    pub store_id: Option<i32>,
+    pub order_id: Option<i32>,
+    pub product_id: Option<i32>,
+    pub variant_id: Option<i32>,
+    pub status: Option<i32>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetSubscriptionsResponse {
+    pub data: Vec<SubscriptionObject>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SubscriptionObject {}
+
+impl LemonSqueezy {
+    pub async fn get_subscriptions(
+        &self,
+        params: GetSubscriptionsParams,
+    ) -> Result<Vec<SubscriptionObject>, anyhow::Error> {
+        let query =
+            serde_qs::to_string(&params).map_err(|_| anyhow!("Failed to serialize params."))?;
+        let url = format!("{}/v1/subscriptions?{}", constants::API_HOST, query);
+        let response = self
+            .client
+            .get(url)
+            .headers(self.headers.clone())
+            .send()
+            .await?
+            .json::<GetSubscriptionsResponse>()
+            .await?;
+
+        Ok(response.data)
     }
 }
