@@ -7,8 +7,10 @@ use axum::{
     Extension, Json,
 };
 use entity::{orders, users};
-use lemon_squeezy::CreateOrderParams as LemonSqueezyCreateOrderParams;
-use sea_orm::{ActiveModelTrait, ActiveValue::Set};
+use lemon_squeezy::CreateCheckoutParams;
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition, EntityTrait, QueryFilter,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -46,7 +48,7 @@ pub async fn crate_order(
 
     let app_endpoint = env::var("APP_ENDPOINT").expect("APP_ENDPOINT is not set in .env file");
     let create_order_result = client
-        .create_order(LemonSqueezyCreateOrderParams {
+        .create_checkout(CreateCheckoutParams {
             email: Some(email),
             store_id: 43821,
             variant_id: 138344,
@@ -54,6 +56,9 @@ pub async fn crate_order(
                 "{}/order/checkout_callback?internal_order_id={}",
                 app_endpoint, internal_order_id
             ),
+            custom_data: json!({
+                "internal_order_id": internal_order_id,
+            }),
         })
         .await
         .map_err(|err| {
@@ -69,7 +74,8 @@ pub async fn crate_order(
 
     let new_order = orders::ActiveModel {
         user_id: Set(user.id),
-        order_id: Set(create_order_result.order_id),
+        product_id: Set(120215),
+        variant_id: Set(138344),
         status: Set(OrderStatus::Created as i32),
         internal_order_id: Set(internal_order_id.clone()),
         redirect_url: Set(format!("{}/{}", redirect_url, internal_order_id.clone())),
@@ -88,7 +94,66 @@ pub async fn crate_order(
     })?;
 
     Ok(Json(json!({
-        "checkout_url": create_order_result.checkout_url,
+        "checkout_url": create_order_result.attributes.url,
         "order_status": result.status
     })))
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CheckOrderStatusParams {
+    internal_order_id: Option<i32>,
+}
+
+pub async fn check_order_status(
+    state: State<AppState>,
+    Extension(user): Extension<users::Model>,
+    extract::Json(params): extract::Json<CheckOrderStatusParams>,
+) -> Result<impl IntoResponse, (StatusCode, Json<AppError>)> {
+    let internal_order_id = params.internal_order_id.ok_or((
+        StatusCode::BAD_REQUEST,
+        Json(AppError {
+            code: "missing_internal_order_id",
+            message: "Missing order id.",
+        }),
+    ))?;
+
+    let order = orders::Entity::find()
+        .filter(
+            Condition::all()
+                .add(orders::Column::InternalOrderId.eq(internal_order_id))
+                .add(orders::Column::UserId.eq(user.id)),
+        )
+        .one(&state.conn)
+        .await
+        .map_err(|err| {
+            sentry::capture_error(&err);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AppError {
+                    code: "database_error",
+                    message: "Failed to query order status. Please try again later.",
+                }),
+            )
+        })?
+        .ok_or((
+            StatusCode::NOT_FOUND,
+            Json(AppError {
+                code: "order_not_found",
+                message: "Order not found.",
+            }),
+        ))?;
+
+    let order_status: OrderStatus = order.status.try_into().map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AppError {
+                code: "invalid_order_status",
+                message: "",
+            }),
+        )
+    })?;
+
+    // TODO: check subscriptions by querying
+
+    Ok("")
 }

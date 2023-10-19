@@ -40,6 +40,7 @@ pub struct CreateCheckoutParams {
     pub store_id: i32,
     pub variant_id: i32,
     pub redirect_url: String,
+    pub custom_data: serde_json::Value,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -51,7 +52,7 @@ pub struct CreateCheckoutResponse {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CheckoutObject {
     id: String,
-    attributes: CheckoutAttributes,
+    pub attributes: CheckoutAttributes,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -62,7 +63,7 @@ pub struct CheckoutLinks {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CheckoutAttributes {
-    url: String,
+    pub url: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -78,7 +79,7 @@ impl LemonSqueezy {
     pub async fn create_checkout(
         &self,
         params: CreateCheckoutParams,
-    ) -> Result<CreateCheckoutResult, anyhow::Error> {
+    ) -> Result<CheckoutObject, anyhow::Error> {
         let url = format!("{}/checkouts", constants::API_HOST);
 
         let response = self
@@ -90,6 +91,7 @@ impl LemonSqueezy {
                     "attributes": {
                         "checkout_data": {
                             "email": params.email.unwrap_or(String::from("")),
+                            "custom": json!(params.custom_data),
                         },
                         "product_options": {
                             "redirect_url": params.redirect_url,
@@ -117,10 +119,7 @@ impl LemonSqueezy {
             .json::<CreateCheckoutResponse>()
             .await?;
 
-        return Ok(CreateCheckoutResult {
-            checkout_url: response.data.attributes.url,
-            order_id: response.data.id,
-        });
+        return Ok(response.data);
     }
 }
 
