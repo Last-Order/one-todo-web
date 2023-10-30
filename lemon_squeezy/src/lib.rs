@@ -1,3 +1,5 @@
+use core::fmt;
+
 use anyhow::anyhow;
 use reqwest::header::{HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
@@ -123,13 +125,43 @@ impl LemonSqueezy {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SubscriptionStatus {
+    OnTrial,
+    Active,
+    Paused,
+    PastDue,
+    Unpaid,
+    Cancelled,
+    Expired,
+    #[default]
+    Unknown,
+}
+
+impl fmt::Display for SubscriptionStatus {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            SubscriptionStatus::OnTrial => write!(f, "on_trial"),
+            SubscriptionStatus::Active => write!(f, "active"),
+            SubscriptionStatus::Paused => write!(f, "paused"),
+            SubscriptionStatus::PastDue => write!(f, "past_due"),
+            SubscriptionStatus::Unpaid => write!(f, "unpaid"),
+            SubscriptionStatus::Cancelled => write!(f, "cancelled"),
+            SubscriptionStatus::Expired => write!(f, "expired"),
+            SubscriptionStatus::Unknown => write!(f, "unknown"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct GetSubscriptionsParams {
-    pub store_id: Option<i32>,
-    pub order_id: Option<i32>,
-    pub product_id: Option<i32>,
-    pub variant_id: Option<i32>,
-    pub status: Option<i32>,
+    pub store_id: i32,
+    pub order_id: i32,
+    pub product_id: i32,
+    pub variant_id: i32,
+    pub status: SubscriptionStatus,
+    pub user_email: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -138,7 +170,27 @@ pub struct GetSubscriptionsResponse {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SubscriptionObject {}
+pub struct SubscriptionObject {
+    pub r#type: String,
+    pub id: String,
+    pub attributes: SubscriptionObjectAttributes,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SubscriptionObjectAttributes {
+    pub store_id: i32,
+    pub customer_id: i32,
+    pub order_id: i32,
+    pub order_item_id: i32,
+    pub product_id: i32,
+    pub variant_id: i32,
+    pub user_email: i32,
+    pub status: SubscriptionStatus,
+    pub status_formatted: String,
+    pub created_at: String,
+    pub renews_at: String,
+    pub ends_at: Option<String>,
+}
 
 impl LemonSqueezy {
     pub async fn get_subscriptions(
@@ -159,4 +211,22 @@ impl LemonSqueezy {
 
         Ok(response.data)
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SubscriptionInvoiceObject {
+    pub r#type: String,
+    pub id: String,
+    pub attributes: SubscriptionInvoiceObjectAttributes,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SubscriptionInvoiceObjectAttributes {
+    pub store_id: i32,
+    pub subscription_id: i32,
+    pub customer_id: i32,
+    pub user_name: String,
+    pub user_email: String,
+    pub status: String,
+    pub status_formatted: String,
 }

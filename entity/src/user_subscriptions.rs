@@ -8,14 +8,32 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub user_id: i32,
+    pub external_subscription_id: String,
+    pub product_id: i32,
+    pub variant_id: i32,
+    pub status: String,
     pub start_time: DateTimeUtc,
-    pub end_time: DateTimeUtc,
+    pub renews_at: DateTimeUtc,
+    pub ends_at: Option<DateTimeUtc>,
     pub r#type: i32,
     pub quota: i32,
     pub created_at: DateTimeUtc,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::users::Entity",
+        from = "Column::UserId",
+        to = "super::users::Column::Id"
+    )]
+    User,
+}
+
+impl Related<super::users::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::User.def()
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}

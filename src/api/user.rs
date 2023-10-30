@@ -40,7 +40,7 @@ pub async fn get_user_profile(
             "subscription_name": subscription_name,
             "subscription_type": subscription.r#type,
             "start_time": subscription.start_time,
-            "end_time": subscription.end_time
+            "renews_at": subscription.renews_at
         });
     } else {
         let subscription_name: String = SubscriptionType::Free.into();

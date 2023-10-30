@@ -123,6 +123,7 @@ pub async fn check_order_status(
                 .add(orders::Column::InternalOrderId.eq(internal_order_id))
                 .add(orders::Column::UserId.eq(user.id)),
         )
+        .into_json()
         .one(&state.conn)
         .await
         .map_err(|err| {
@@ -143,17 +144,21 @@ pub async fn check_order_status(
             }),
         ))?;
 
-    let order_status: OrderStatus = order.status.try_into().map_err(|_| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(AppError {
-                code: "invalid_order_status",
-                message: "",
-            }),
-        )
-    })?;
+    // let order_status: OrderStatus = order.status.try_into().map_err(|_| {
+    //     (
+    //         StatusCode::INTERNAL_SERVER_ERROR,
+    //         Json(AppError {
+    //             code: "invalid_order_status",
+    //             message: "",
+    //         }),
+    //     )
+    // })?;
 
-    // TODO: check subscriptions by querying
+    // if matches!(order_status, OrderStatus::Created) {
 
-    Ok("")
+    // }
+
+    // // TODO: check subscriptions by querying
+
+    Ok(Json(order))
 }

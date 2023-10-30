@@ -1,9 +1,14 @@
+use std::env;
+
 use axum::extract::State;
 use chrono::Duration;
 use entity::{user_subscriptions, users};
-use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
+use lemon_squeezy::{GetSubscriptionsParams, SubscriptionStatus};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition, EntityTrait, QueryFilter,
+};
 
-use crate::api::{AppError, AppState};
+use crate::api::{constants::SubscriptionType, AppError, AppState};
 
 use super::extract_history::count_extract_history;
 
@@ -11,13 +16,10 @@ pub async fn get_valid_subscription(
     app_state: &State<AppState>,
     user: &users::Model,
 ) -> Result<Option<user_subscriptions::Model>, AppError> {
-    let current_time = chrono::Utc::now();
-
     let result = user_subscriptions::Entity::find()
         .filter(
             Condition::all()
-                .add(user_subscriptions::Column::StartTime.lt(current_time))
-                .add(user_subscriptions::Column::EndTime.gt(current_time))
+                .add(user_subscriptions::Column::Status.eq(SubscriptionStatus::Active.to_string()))
                 .add(user_subscriptions::Column::UserId.eq(user.id)),
         )
         .one(&app_state.conn)
@@ -46,7 +48,6 @@ pub async fn get_user_quota_and_subscription(
 ) -> Result<UserQuotaAndSubscriptionInfo, AppError> {
     let user = users::Entity::find()
         .filter(users::Column::Id.eq(user.id))
-        // .into_json()
         .one(&app_state.conn)
         .await
         .map_err(|_| AppError {
@@ -69,8 +70,12 @@ pub async fn get_user_quota_and_subscription(
     let mut period_start_time = chrono::Utc::now() - Duration::seconds(60 * 60 * 24 * 31);
 
     if subscription.is_some() {
+        let subscription_start_time = subscription.as_ref().unwrap().start_time;
         quota = subscription.as_ref().unwrap().quota;
-        period_start_time = subscription.as_ref().unwrap().start_time;
+        if subscription_start_time > period_start_time {
+            // 如果订阅开始时间在31天内 则以订阅开始时间为准 之前的调用不算
+            period_start_time = subscription_start_time;
+        }
     }
 
     let extract_count =
@@ -85,4 +90,114 @@ pub async fn get_user_quota_and_subscription(
     };
 
     return Ok(result);
+}
+
+pub async fn sync_subscription_status_with_lemon_squeezy(
+    app_state: &State<AppState>,
+    user: users::Model,
+) -> Result<(), AppError> {
+    let user_active_subscription = get_valid_subscription(app_state, &user).await?;
+    let client = lemon_squeezy::LemonSqueezy::new(
+        env::var("LEMON_SQUEEZY_API_KEY").expect("LEMON_SQUEEZY_API_KEY is not set in .env file"),
+    );
+    let subscription = client
+        .get_subscriptions(GetSubscriptionsParams {
+            user_email: user.email,
+            store_id: 43821,
+            variant_id: 138344,
+            status: SubscriptionStatus::Active,
+            ..Default::default()
+        })
+        .await
+        .map_err(|err| {
+            sentry::integrations::anyhow::capture_anyhow(&err);
+            AppError {
+                code: "failed_to_sync_subscriptions",
+                message: "",
+            }
+        })?;
+    let first_active_subscription = subscription.first();
+    if first_active_subscription.is_none() {
+        // LemonSqueezy 无记录订阅 无事发生
+        return Ok(());
+    }
+    let first_active_subscription = first_active_subscription.unwrap();
+    let first_active_subscription_start_time = first_active_subscription
+        .attributes
+        .created_at
+        .parse::<chrono::DateTime<chrono::Utc>>()
+        .map_err(|err| {
+            sentry::capture_error(&err);
+            AppError {
+                code: "invalid_subscription_start_time",
+                message: "",
+            }
+        })?;
+    let first_active_subscription_renews_at = first_active_subscription
+        .attributes
+        .renews_at
+        .parse::<chrono::DateTime<chrono::Utc>>()
+        .map_err(|err| {
+            sentry::capture_error(&err);
+            AppError {
+                code: "invalid_subscription_renews_at",
+                message: "",
+            }
+        })?;
+    let first_active_subscription_ends_at = first_active_subscription
+        .attributes
+        .ends_at
+        .clone()
+        .map(|ends_at| ends_at.parse::<chrono::DateTime<chrono::Utc>>().unwrap());
+
+    if user_active_subscription.is_none() {
+        let new_subscription = user_subscriptions::ActiveModel {
+            user_id: Set(user.id),
+            start_time: Set(first_active_subscription_start_time),
+            renews_at: Set(first_active_subscription_renews_at),
+            ends_at: Set(first_active_subscription_ends_at),
+            // maybe multiple plans in the future
+            product_id: Set(first_active_subscription.attributes.product_id),
+            variant_id: Set(first_active_subscription.attributes.variant_id),
+            status: Set(first_active_subscription.attributes.status.to_string()),
+            external_subscription_id: Set(first_active_subscription.id.clone()),
+            r#type: Set(SubscriptionType::Pro as i32),
+            quota: Set(125),
+            ..Default::default()
+        };
+
+        let _ = new_subscription
+            .save(&app_state.conn)
+            .await
+            .map_err(|err| {
+                sentry::capture_error(&err);
+                AppError {
+                    code: "database_error",
+                    message: "",
+                }
+            })?;
+    } else {
+        // update user subscription with remote information
+        let mut modified_subscription: user_subscriptions::ActiveModel =
+            user_active_subscription.unwrap().into();
+
+        modified_subscription.start_time = Set(first_active_subscription_start_time);
+        modified_subscription.renews_at = Set(first_active_subscription_renews_at);
+        modified_subscription.ends_at = Set(first_active_subscription_ends_at);
+        modified_subscription.status = Set(first_active_subscription.attributes.status.to_string());
+        modified_subscription.external_subscription_id = Set(first_active_subscription.id.clone());
+
+        let _ = modified_subscription
+            .save(&app_state.conn)
+            .await
+            .map_err(|err| {
+                sentry::capture_error(&err);
+                AppError {
+                    code: "database_error",
+                    message: "",
+                }
+            })?;
+    }
+
+    Ok(())
 }
