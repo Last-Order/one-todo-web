@@ -8,3 +8,8 @@ services:
         restart: always
         extra_hosts:    
             - "host.docker.internal:host-gateway"
+        volumes:
+            - type: bind
+              source: ./.env
+              target: /usr/src/one_todo/.env
+              read_only: true

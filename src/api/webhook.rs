@@ -127,7 +127,11 @@ pub async fn handle_subscription_payment_success(
             }),
         ))?;
 
-    sync_subscription_status_with_lemon_squeezy(&state, user);
+    let _ = sync_subscription_status_with_lemon_squeezy(&state, user)
+        .await
+        .map_err(|err| {
+            sentry::capture_error(&err);
+        });
 
     Ok(Json(()))
 }

@@ -12,6 +12,7 @@ use api::{
         update_event_status,
     },
     user::get_user_profile,
+    webhook::handle_lemon_squeezy_webhook,
     AppState,
 };
 use axum::{
@@ -55,7 +56,7 @@ fn main() {
             let app = Router::new()
                 .route(
                     "/webhook/lemonsqueezy",
-                    post(|| async { "It works" })
+                    post(handle_lemon_squeezy_webhook)
                         .layer(middleware::from_fn(lemon_squeezy_webhook_auth::auth)),
                 )
                 .route("/user/profile", get(get_user_profile))

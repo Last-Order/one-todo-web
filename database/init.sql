@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS `extract_history` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `user_id` (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=50 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 数据导出被取消选择。
 
@@ -40,7 +40,23 @@ CREATE TABLE IF NOT EXISTS `oauth2_state_storage` (
   `return_url` varchar(200) CHARACTER SET utf8mb4 NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=41 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- 数据导出被取消选择。
+
+-- 导出  表 todo.orders 结构
+CREATE TABLE IF NOT EXISTS `orders` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `product_id` int(11) NOT NULL,
+  `variant_id` int(11) NOT NULL,
+  `internal_order_id` varchar(50) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `redirect_url` text NOT NULL,
+  `status` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `internal_order_id` (`internal_order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 数据导出被取消选择。
 
@@ -57,7 +73,7 @@ CREATE TABLE IF NOT EXISTS `todos` (
   PRIMARY KEY (`id`),
   KEY `created_at` (`created_at`),
   KEY `user_id` (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=28 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- 数据导出被取消选择。
 
@@ -73,7 +89,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `has_google_calendar_access` tinyint(1) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- 数据导出被取消选择。
 
@@ -81,14 +97,21 @@ CREATE TABLE IF NOT EXISTS `users` (
 CREATE TABLE IF NOT EXISTS `user_subscriptions` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
+  `external_subscription_id` varchar(50) NOT NULL,
+  `product_id` int(11) NOT NULL,
+  `variant_id` int(11) NOT NULL,
+  `status` varchar(50) NOT NULL,
   `start_time` timestamp NOT NULL DEFAULT current_timestamp(),
-  `end_time` timestamp NOT NULL DEFAULT current_timestamp(),
+  `renews_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `ends_at` timestamp NULL DEFAULT current_timestamp(),
   `type` int(11) NOT NULL,
   `quota` int(11) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
-  KEY `user_id` (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4;
+  KEY `user_id` (`user_id`),
+  KEY `external_subscription_id` (`external_subscription_id`),
+  KEY `status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 数据导出被取消选择。
 
