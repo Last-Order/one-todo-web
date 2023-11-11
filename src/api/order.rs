@@ -3,7 +3,7 @@ use std::env;
 use axum::{
     extract::{self, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{IntoResponse, Redirect},
     Extension, Json,
 };
 use entity::{orders, users};
@@ -97,6 +97,53 @@ pub async fn crate_order(
         "checkout_url": create_order_result.attributes.url,
         "order_status": result.status
     })))
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CheckoutCallbackQuery {
+    internal_order_id: Option<i32>,
+}
+
+pub async fn checkout_callback(
+    state: State<AppState>,
+    Extension(user): Extension<users::Model>,
+    extract::Query(query): extract::Query<CheckoutCallbackQuery>,
+) -> Result<impl IntoResponse, (StatusCode, Json<AppError>)> {
+    let internal_order_id = query.internal_order_id.ok_or((
+        StatusCode::BAD_REQUEST,
+        Json(AppError {
+            code: "missing_internal_order_id",
+            message: "Missing order id.",
+        }),
+    ))?;
+
+    let order = orders::Entity::find()
+        .filter(
+            Condition::all()
+                .add(orders::Column::InternalOrderId.eq(internal_order_id))
+                .add(orders::Column::UserId.eq(user.id)),
+        )
+        .one(&state.conn)
+        .await
+        .map_err(|err| {
+            sentry::capture_error(&err);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AppError {
+                    code: "database_error",
+                    message: "Failed to query order status. Please try again later.",
+                }),
+            )
+        })?
+        .ok_or((
+            StatusCode::NOT_FOUND,
+            Json(AppError {
+                code: "order_not_found",
+                message: "Order not found.",
+            }),
+        ))?;
+
+    Ok(Redirect::temporary(order.redirect_url.as_str()))
 }
 
 #[derive(Serialize, Deserialize)]

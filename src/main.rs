@@ -6,7 +6,7 @@ use std::env;
 
 use api::{
     oauth::{login, oauth_callback},
-    order::{check_order_status, crate_order},
+    order::{check_order_status, checkout_callback, crate_order},
     todo::{
         create_event, delete_event, get_upcoming_events, prepare_create_event, update_event,
         update_event_status,
@@ -67,6 +67,7 @@ fn main() {
                 .route("/event/update", post(update_event))
                 .route("/event/delete", post(delete_event))
                 .route("/order/checkout", post(crate_order))
+                .route("/order/checkout_callback", get(checkout_callback))
                 .route("/order/check_order_status", get(check_order_status))
                 .layer(middleware::from_fn_with_state(
                     state.clone(),

@@ -3,7 +3,7 @@ use std::env;
 use axum::extract::State;
 use chrono::Duration;
 use entity::{user_subscriptions, users};
-use lemon_squeezy::{GetSubscriptionsParams, SubscriptionStatus};
+use lemon_squeezy::SubscriptionStatus;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition, EntityTrait, QueryFilter,
 };
