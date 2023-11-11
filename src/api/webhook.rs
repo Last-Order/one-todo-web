@@ -1,5 +1,3 @@
-use std::env;
-
 use axum::{
     extract::{self, State},
     http::StatusCode,
@@ -7,7 +5,7 @@ use axum::{
     Json,
 };
 use entity::{orders, users};
-use lemon_squeezy::GetSubscriptionsParams;
+use lemon_squeezy::SubscriptionInvoiceObject;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 
@@ -90,6 +88,18 @@ pub async fn handle_subscription_payment_success(
     payload: LemonSqueezyWebhookPayload<LemonSqueezyWebhookCustomData>,
     order: orders::Model,
 ) -> Result<Json<()>, (StatusCode, Json<AppError>)> {
+    let payload: SubscriptionInvoiceObject =
+        serde_json::from_value(payload.data).map_err(|err| {
+            sentry::capture_error(&err);
+            (
+                StatusCode::BAD_REQUEST,
+                Json(AppError {
+                    code: "failed_to_parse_webhook_payload",
+                    message: "",
+                }),
+            )
+        })?;
+
     if order.status == OrderStatus::Created as i32 {
         let mut order: orders::ActiveModel = order.clone().into();
         order.status = Set(OrderStatus::Finished as i32);
@@ -127,11 +137,15 @@ pub async fn handle_subscription_payment_success(
             }),
         ))?;
 
-    let _ = sync_subscription_status_with_lemon_squeezy(&state, user)
-        .await
-        .map_err(|err| {
-            sentry::capture_error(&err);
-        });
+    let _ = sync_subscription_status_with_lemon_squeezy(
+        &state,
+        user,
+        payload.attributes.subscription_id,
+    )
+    .await
+    .map_err(|err| {
+        sentry::capture_error(&err);
+    });
 
     Ok(Json(()))
 }

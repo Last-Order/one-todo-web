@@ -170,6 +170,11 @@ pub struct GetSubscriptionsResponse {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetSubscriptionResponse {
+    pub data: SubscriptionObject,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SubscriptionObject {
     pub r#type: String,
     pub id: String,
@@ -193,6 +198,29 @@ pub struct SubscriptionObjectAttributes {
 }
 
 impl LemonSqueezy {
+    /** Get subscription by id */
+    pub async fn get_subscription(
+        &self,
+        subscription_id: i32,
+    ) -> Result<SubscriptionObject, anyhow::Error> {
+        let url = format!(
+            "{}/v1/subscriptions/{}",
+            constants::API_HOST,
+            subscription_id
+        );
+        let response = self
+            .client
+            .get(url)
+            .headers(self.headers.clone())
+            .send()
+            .await?
+            .json::<GetSubscriptionResponse>()
+            .await?;
+
+        Ok(response.data)
+    }
+
+    /** Get subscriptions by conditions */
     pub async fn get_subscriptions(
         &self,
         params: GetSubscriptionsParams,

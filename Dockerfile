@@ -6,4 +6,4 @@ COPY . .
 
 RUN cargo build --release --locked
 
-RUN cargo run --release --locked
+CMD cargo run --release --locked
