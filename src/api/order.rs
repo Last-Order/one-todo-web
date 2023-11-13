@@ -101,12 +101,11 @@ pub async fn crate_order(
 
 #[derive(Serialize, Deserialize)]
 pub struct CheckoutCallbackQuery {
-    internal_order_id: Option<i32>,
+    internal_order_id: Option<String>,
 }
 
 pub async fn checkout_callback(
     state: State<AppState>,
-    Extension(user): Extension<users::Model>,
     extract::Query(query): extract::Query<CheckoutCallbackQuery>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<AppError>)> {
     let internal_order_id = query.internal_order_id.ok_or((
@@ -118,11 +117,7 @@ pub async fn checkout_callback(
     ))?;
 
     let order = orders::Entity::find()
-        .filter(
-            Condition::all()
-                .add(orders::Column::InternalOrderId.eq(internal_order_id))
-                .add(orders::Column::UserId.eq(user.id)),
-        )
+        .filter(Condition::all().add(orders::Column::InternalOrderId.eq(internal_order_id)))
         .one(&state.conn)
         .await
         .map_err(|err| {

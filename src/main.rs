@@ -67,7 +67,6 @@ fn main() {
                 .route("/event/update", post(update_event))
                 .route("/event/delete", post(delete_event))
                 .route("/order/checkout", post(crate_order))
-                .route("/order/checkout_callback", get(checkout_callback))
                 .route("/order/check_order_status", get(check_order_status))
                 .layer(middleware::from_fn_with_state(
                     state.clone(),
@@ -80,6 +79,7 @@ fn main() {
                         .allow_origin(Any)
                         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]),
                 )
+                .route("/order/checkout_callback", get(checkout_callback))
                 .route("/oauth/google/login", get(login))
                 .route("/oauth/google/callback", get(oauth_callback))
                 .with_state(state);
