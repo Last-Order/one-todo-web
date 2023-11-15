@@ -1,8 +1,7 @@
 services:
     one-todo:
         container_name: one-todo
-        build:
-            context: .
+        image: "ghcr.io/last-order/one-todo-web:release"
         ports:
             - "127.0.0.1:3000:3000"
         restart: always
