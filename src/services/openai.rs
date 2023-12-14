@@ -18,7 +18,7 @@ struct Message {
     content: String,
 }
 
-pub async fn get_completion(prompt: &str) -> Result<String, AppError> {
+pub async fn get_completion(model_name: &str, prompt: &str) -> Result<String, AppError> {
     let api_endpoint =
         env::var("OPENAI_API_ENDPOINT").expect("OPENAI_API_ENDPOINT is not set in .env file");
     let api_key = env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY is not set in .env file");
@@ -27,7 +27,7 @@ pub async fn get_completion(prompt: &str) -> Result<String, AppError> {
     let client = reqwest::Client::new();
 
     let request_payload = GetCompletionPayload {
-        model: "gpt-4".to_owned(),
+        model: model_name.to_owned(),
         messages: vec![Message {
             role: "user".to_owned(),
             content: prompt.to_owned(),
