@@ -54,11 +54,6 @@ fn main() {
 
             // build our application with a single route
             let app = Router::new()
-                .route(
-                    "/webhook/lemonsqueezy",
-                    post(handle_lemon_squeezy_webhook)
-                        .layer(middleware::from_fn(lemon_squeezy_webhook_auth::auth)),
-                )
                 .route("/user/profile", get(get_user_profile))
                 .route("/event/upcoming", get(get_upcoming_events))
                 .route("/event/update_status", post(update_event_status))
@@ -82,6 +77,11 @@ fn main() {
                 .route("/order/checkout_callback", get(checkout_callback))
                 .route("/oauth/google/login", get(login))
                 .route("/oauth/google/callback", get(oauth_callback))
+                .route(
+                    "/webhook/lemonsqueezy",
+                    post(handle_lemon_squeezy_webhook)
+                        .layer(middleware::from_fn(lemon_squeezy_webhook_auth::auth)),
+                )
                 .with_state(state);
 
             // run it with hyper on localhost:3000
