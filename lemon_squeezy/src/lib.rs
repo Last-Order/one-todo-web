@@ -189,7 +189,7 @@ pub struct SubscriptionObjectAttributes {
     pub order_item_id: i32,
     pub product_id: i32,
     pub variant_id: i32,
-    pub user_email: i32,
+    pub user_email: String,
     pub status: SubscriptionStatus,
     pub status_formatted: String,
     pub created_at: String,
