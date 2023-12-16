@@ -31,6 +31,6 @@ chrono = "0.4.26"
 url = "2.4.0"
 tower-http = { version = "0.4.3", features = ["cors"] }
 regex = "1.9.3"
-sentry = { version = "0.31.7", features = ["anyhow"] }
+sentry = { version = "0.31.7", features = ["anyhow", "debug-images"] }
 ring = { version = "0.17.3", features = ["std"] }
 uuid = { version = "1.4.1", features = ["v4"] }

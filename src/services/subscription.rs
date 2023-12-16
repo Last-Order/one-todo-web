@@ -111,7 +111,7 @@ pub async fn sync_subscription_status_with_lemon_squeezy(
             sentry::integrations::anyhow::capture_anyhow(&err);
             AppError {
                 code: "failed_to_sync_subscriptions",
-                message: "",
+                message: "failed_to_sync_subscriptions",
             }
         })?;
 
@@ -123,7 +123,7 @@ pub async fn sync_subscription_status_with_lemon_squeezy(
             sentry::capture_error(&err);
             AppError {
                 code: "invalid_subscription_start_time",
-                message: "",
+                message: "invalid_subscription_start_time",
             }
         })?;
     let subscription_renews_at = subscription
@@ -134,7 +134,7 @@ pub async fn sync_subscription_status_with_lemon_squeezy(
             sentry::capture_error(&err);
             AppError {
                 code: "invalid_subscription_renews_at",
-                message: "",
+                message: "invalid_subscription_renews_at",
             }
         })?;
     let subscription_ends_at = subscription
