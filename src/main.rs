@@ -31,7 +31,6 @@ fn main() {
         env::var("SENTRY_DSN").expect("SENTRY_DSN is not set in .env file"),
         sentry::ClientOptions {
             release: sentry::release_name!(),
-            debug: true,
             ..Default::default()
         },
     ));
@@ -85,6 +84,8 @@ fn main() {
                 )
                 .with_state(state);
 
+            const VERSION: &str = env!("CARGO_PKG_VERSION");
+            println!("Starting server.. version: {}", VERSION);
             // run it with hyper on localhost:3000
             axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
                 .serve(app.into_make_service())
