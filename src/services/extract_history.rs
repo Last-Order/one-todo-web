@@ -20,9 +20,12 @@ pub async fn record_extract_history(
     }
     .save(&app_state.conn)
     .await
-    .map_err(|err| AppError {
-        code: "record_extract_history_error",
-        message: "Please try again later.",
+    .map_err(|err| {
+        sentry::capture_error(&err);
+        AppError {
+            code: "record_extract_history_error",
+            message: "Please try again later.",
+        }
     })?;
     Ok(())
 }

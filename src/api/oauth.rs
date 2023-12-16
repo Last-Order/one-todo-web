@@ -7,7 +7,6 @@ use axum::{
     response::{IntoResponse, Redirect},
     Json,
 };
-use axum_macros::debug_handler;
 use chrono;
 use entity::{oauth2_state_storage, users};
 use jsonwebtoken::{encode, EncodingKey, Header};

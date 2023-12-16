@@ -203,18 +203,16 @@ impl LemonSqueezy {
         &self,
         subscription_id: i32,
     ) -> Result<SubscriptionObject, anyhow::Error> {
-        let url = format!(
-            "{}/v1/subscriptions/{}",
-            constants::API_HOST,
-            subscription_id
-        );
+        let url = format!("{}/subscriptions/{}", constants::API_HOST, subscription_id);
 
         let response = self
             .client
             .get(url)
             .headers(self.headers.clone())
             .send()
-            .await?.text().await?;
+            .await?
+            .text()
+            .await?;
 
         println!("get_subscription response: {}", &response);
 
@@ -230,7 +228,7 @@ impl LemonSqueezy {
     ) -> Result<Vec<SubscriptionObject>, anyhow::Error> {
         let query =
             serde_qs::to_string(&params).map_err(|_| anyhow!("Failed to serialize params."))?;
-        let url = format!("{}/v1/subscriptions?{}", constants::API_HOST, query);
+        let url = format!("{}/subscriptions?{}", constants::API_HOST, query);
         let response = self
             .client
             .get(url)
