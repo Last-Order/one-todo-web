@@ -208,16 +208,19 @@ impl LemonSqueezy {
             constants::API_HOST,
             subscription_id
         );
+
         let response = self
             .client
             .get(url)
             .headers(self.headers.clone())
             .send()
-            .await?
-            .json::<GetSubscriptionResponse>()
-            .await?;
+            .await?.text().await?;
 
-        Ok(response.data)
+        println!("get_subscription response: {}", &response);
+
+        let parsed_response = serde_json::from_str::<GetSubscriptionResponse>(&response)?;
+
+        Ok(parsed_response.data)
     }
 
     /** Get subscriptions by conditions */

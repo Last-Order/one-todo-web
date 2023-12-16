@@ -31,6 +31,7 @@ fn main() {
         env::var("SENTRY_DSN").expect("SENTRY_DSN is not set in .env file"),
         sentry::ClientOptions {
             release: sentry::release_name!(),
+            debug: true,
             ..Default::default()
         },
     ));
