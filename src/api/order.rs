@@ -143,13 +143,13 @@ pub async fn checkout_callback(
 
 #[derive(Serialize, Deserialize)]
 pub struct CheckOrderStatusParams {
-    internal_order_id: Option<i32>,
+    internal_order_id: Option<String>,
 }
 
 pub async fn check_order_status(
     state: State<AppState>,
     Extension(user): Extension<users::Model>,
-    extract::Json(params): extract::Json<CheckOrderStatusParams>,
+    extract::Query(params): extract::Query<CheckOrderStatusParams>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<AppError>)> {
     let internal_order_id = params.internal_order_id.ok_or((
         StatusCode::BAD_REQUEST,
@@ -185,22 +185,6 @@ pub async fn check_order_status(
                 message: "Order not found.",
             }),
         ))?;
-
-    // let order_status: OrderStatus = order.status.try_into().map_err(|_| {
-    //     (
-    //         StatusCode::INTERNAL_SERVER_ERROR,
-    //         Json(AppError {
-    //             code: "invalid_order_status",
-    //             message: "",
-    //         }),
-    //     )
-    // })?;
-
-    // if matches!(order_status, OrderStatus::Created) {
-
-    // }
-
-    // // TODO: check subscriptions by querying
 
     Ok(Json(order))
 }
