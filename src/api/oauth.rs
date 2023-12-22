@@ -273,13 +273,7 @@ pub async fn oauth_callback(
     let first_name = body["family_name"]
         .take()
         .as_str()
-        .ok_or((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(AppError {
-                code: "invalid_name",
-                message: "",
-            }),
-        ))?
+        .unwrap_or("")
         .to_owned();
 
     let last_name = body["given_name"].take().as_str().unwrap_or("").to_owned();
