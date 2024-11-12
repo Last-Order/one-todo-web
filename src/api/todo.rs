@@ -253,7 +253,7 @@ pub async fn prepare_create_event(
     // apply GPT-4 for paid user
     if let Some(subscription) = quota_and_subscription_info.subscription {
         if subscription.r#type == SubscriptionType::Pro as i32 {
-            selected_model = "gpt-4";
+            selected_model = "gpt-4o";
         }
     }
 
